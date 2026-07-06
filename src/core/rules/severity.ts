@@ -4,10 +4,14 @@
 import type { IssueType, NoteIssue, SortMode } from "../../types";
 import { ISSUE_TYPES } from "../../types";
 
+// One reused collator — meaningfully faster than String.localeCompare across
+// thousands of comparisons, and numeric-aware so "note2" sorts before "note10".
+const COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
 /**
  * Return a new array of issues ordered per `mode` (input is never mutated):
  * - "severity": severity descending, then noteName ascending, then notePath ascending.
- * - "title": noteName ascending (localeCompare), then notePath ascending.
+ * - "title": noteName ascending, then notePath ascending.
  * - "path": notePath ascending.
  */
 export function sortIssues(issues: NoteIssue[], mode: SortMode): NoteIssue[] {
@@ -15,16 +19,16 @@ export function sortIssues(issues: NoteIssue[], mode: SortMode): NoteIssue[] {
   sorted.sort((a, b) => {
     if (mode === "severity") {
       if (b.severity !== a.severity) return b.severity - a.severity;
-      const byName = a.noteName.localeCompare(b.noteName);
+      const byName = COLLATOR.compare(a.noteName, b.noteName);
       if (byName !== 0) return byName;
-      return a.notePath.localeCompare(b.notePath);
+      return COLLATOR.compare(a.notePath, b.notePath);
     }
     if (mode === "title") {
-      const byName = a.noteName.localeCompare(b.noteName);
+      const byName = COLLATOR.compare(a.noteName, b.noteName);
       if (byName !== 0) return byName;
-      return a.notePath.localeCompare(b.notePath);
+      return COLLATOR.compare(a.notePath, b.notePath);
     }
-    return a.notePath.localeCompare(b.notePath);
+    return COLLATOR.compare(a.notePath, b.notePath);
   });
   return sorted;
 }

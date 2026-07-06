@@ -58,8 +58,11 @@ export default class NoteDoctorPlugin extends Plugin {
   /** Debounce handle for coalescing rapid ignore/reviewed writes. */
   private saveTimer: number | null = null;
 
-  /** Aborts a pending cache-settle wait if the plugin unloads mid-flight. */
-  private abortCacheWait: (() => void) | null = null;
+  /** Pending post-bulk settle timer; cleared on unload so no scan fires after. */
+  private settleTimer: number | null = null;
+
+  /** Coalesces a burst of vault events into a single view refresh. */
+  private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -102,13 +105,13 @@ export default class NoteDoctorPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         if (this.migratePath(oldPath, file.path)) void this.saveSettings();
-        if (this.remapLastResult(oldPath, file.path)) this.refreshViews();
+        if (this.remapLastResult(oldPath, file.path)) this.scheduleRefresh();
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         if (this.dropPath(file.path)) void this.saveSettings();
-        if (this.dropLastResult(file.path)) this.refreshViews();
+        if (this.dropLastResult(file.path)) this.scheduleRefresh();
       })
     );
 
@@ -177,7 +180,14 @@ export default class NoteDoctorPlugin extends Plugin {
 
   onunload(): void {
     this.flushPendingSave();
-    if (this.abortCacheWait) this.abortCacheWait();
+    if (this.settleTimer !== null) {
+      window.clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    }
+    if (this.refreshTimer !== null) {
+      window.clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   private rebuildKeySets(): void {
@@ -228,6 +238,15 @@ export default class NoteDoctorPlugin extends Plugin {
 
   refreshViews(): void {
     for (const view of this.views()) view.render();
+  }
+
+  /** Debounced refresh, coalescing a burst of vault events into one render. */
+  private scheduleRefresh(): void {
+    if (this.refreshTimer !== null) return;
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = null;
+      this.refreshViews();
+    }, 50);
   }
 
   private views(): NoteDoctorView[] {
@@ -334,14 +353,26 @@ export default class NoteDoctorPlugin extends Plugin {
 
   /** Exclude a note's path from all future scans. Caller refreshes its own UI. */
   async excludeNote(path: string): Promise<void> {
-    if (!this.settings.excludedPaths.includes(path)) {
-      this.settings.excludedPaths = [...this.settings.excludedPaths, path];
-    }
+    const wasNew = !this.settings.excludedPaths.includes(path);
+    if (wasNew) this.settings.excludedPaths = [...this.settings.excludedPaths, path];
     if (this.lastResult) {
       this.lastResult.issues = this.lastResult.issues.filter((i) => i.notePath !== path);
     }
     await this.saveSettings();
-    new Notice(`${PRODUCT_NAME}: excluded ${path} from future scans.`);
+    // Excluding is permanent; offer a one-click undo like ignore does.
+    const frag = createFragment((f) => {
+      f.appendText(`Excluded "${path}" from future scans. `);
+      const undo = f.createEl("a", { text: "Undo", cls: "note-doctor-inline-link" });
+      undo.addEventListener("click", () => void this.unexcludeNote(path));
+    });
+    new Notice(frag, 6000);
+  }
+
+  /** Reverse an exclusion (undo affordance) and re-scan to bring the note back. */
+  async unexcludeNote(path: string): Promise<void> {
+    this.settings.excludedPaths = this.settings.excludedPaths.filter((p) => p !== path);
+    await this.saveSettings();
+    await this.runScan(this.lastResult?.profileId);
   }
 
   /** Rewrite stored keys/paths when a note (or folder) is renamed or moved. */
@@ -537,20 +568,29 @@ export default class NoteDoctorPlugin extends Plugin {
     }
     const changed: string[] = [];
     let skipped = 0;
+    let failed = 0;
     for (const path of unique(paths)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       let didSet = false;
-      await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        if (isMeaningful(fm[key])) return;
-        fm[key] = value;
-        didSet = true;
-      });
+      try {
+        await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+          if (isMeaningful(fm[key])) return;
+          fm[key] = value;
+          didSet = true;
+        });
+      } catch (err) {
+        console.error(`Note Doctor: could not edit ${path}`, err);
+        failed++;
+        continue;
+      }
       if (didSet) changed.push(path);
       else skipped++;
     }
-    const tail = skipped > 0 ? ` (${skipped} already had it)` : "";
-    new Notice(`${PRODUCT_NAME}: set "${key}" on ${changed.length} note(s)${tail}.`);
+    const parts = [`set "${key}" on ${changed.length} note(s)`];
+    if (skipped > 0) parts.push(`${skipped} already had it`);
+    if (failed > 0) parts.push(`${failed} failed — see console`);
+    new Notice(`${PRODUCT_NAME}: ${parts.join(", ")}.`);
     return changed;
   }
 
@@ -558,62 +598,61 @@ export default class NoteDoctorPlugin extends Plugin {
   async bulkAddTag(paths: string[], tag: string): Promise<string[]> {
     const clean = tag.replace(/^#/, "").trim();
     if (!clean) return [];
+    const norm = (t: unknown): string => {
+      if (typeof t === "string") return t.replace(/^#/, "").trim();
+      if (typeof t === "number" || typeof t === "boolean") return String(t);
+      return ""; // skip null/blank/nested entries
+    };
     const changed: string[] = [];
+    let failed = 0;
     for (const path of unique(paths)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       let added = false;
-      await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        const existing = fm.tags;
-        // A scalar `tags: reading, todo` is two tags to Obsidian — split it the
-        // same way. Leave any unexpected shape (number/object) untouched.
-        if (existing != null && !Array.isArray(existing) && typeof existing !== "string") return;
-        const tags: string[] = Array.isArray(existing)
-          ? existing.map((t) => String(t))
-          : typeof existing === "string"
-            ? existing
-                .split(/[,\s]+/)
-                .map((t) => t.replace(/^#/, "").trim())
-                .filter((t) => t.length > 0)
-            : [];
-        if (tags.includes(clean)) return;
-        tags.push(clean);
-        fm.tags = tags;
-        added = true;
-      });
+      try {
+        await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+          const existing = fm.tags;
+          // A scalar `tags: reading, todo` is two tags to Obsidian — split it the
+          // same way. Leave any unexpected shape (number/object) untouched.
+          if (existing != null && !Array.isArray(existing) && typeof existing !== "string") return;
+          // Normalize entries and drop empties/nulls so we never write a "null" tag.
+          const tags: string[] = Array.isArray(existing)
+            ? existing.map(norm).filter((t) => t.length > 0)
+            : typeof existing === "string"
+              ? existing.split(/[,\s]+/).map(norm).filter((t) => t.length > 0)
+              : [];
+          if (tags.includes(clean)) return;
+          tags.push(clean);
+          fm.tags = tags;
+          added = true;
+        });
+      } catch (err) {
+        console.error(`Note Doctor: could not tag ${path}`, err);
+        failed++;
+        continue;
+      }
       if (added) changed.push(path);
     }
-    new Notice(`${PRODUCT_NAME}: added #${clean} to ${changed.length} note(s).`);
+    const tail = failed > 0 ? ` (${failed} failed — see console)` : "";
+    new Notice(`${PRODUCT_NAME}: added #${clean} to ${changed.length} note(s)${tail}.`);
     return changed;
   }
 
-  /** Wait for the metadata cache to reparse the given paths, then re-scan. */
+  /**
+   * Give Obsidian a moment to reparse the just-written files into metadataCache,
+   * then re-scan. A short fixed delay is reliable and jank-free here (the writes
+   * have already resolved); the timer is cleared on unload so no scan fires after.
+   */
   async settleCacheThenRescan(paths: string[]): Promise<void> {
-    if (paths.length > 0) await this.awaitCacheChanges(paths);
-    await this.runScan(this.lastResult?.profileId);
-  }
-
-  /** Resolve once the metadata cache has emitted `changed` for every path (or 2s,
-   *  or immediately if the plugin unloads). */
-  private awaitCacheChanges(paths: string[]): Promise<void> {
-    const pending = new Set(paths);
-    return new Promise<void>((resolve) => {
-      let done = false;
-      const finish = (): void => {
-        if (done) return;
-        done = true;
-        this.app.metadataCache.offref(ref);
-        window.clearTimeout(timer);
-        this.abortCacheWait = null;
-        resolve();
-      };
-      const ref = this.app.metadataCache.on("changed", (file) => {
-        pending.delete(file.path);
-        if (pending.size === 0) finish();
+    if (paths.length > 0) {
+      await new Promise<void>((resolve) => {
+        this.settleTimer = window.setTimeout(() => {
+          this.settleTimer = null;
+          resolve();
+        }, 500);
       });
-      const timer = window.setTimeout(finish, 2000);
-      this.abortCacheWait = finish;
-    });
+    }
+    if (this.settleTimer === null) await this.runScan(this.lastResult?.profileId);
   }
 
   /** Public debounced-save hook for the settings tab's field edits. */

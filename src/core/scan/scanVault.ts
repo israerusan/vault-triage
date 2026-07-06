@@ -50,35 +50,40 @@ export async function scanVault(
   // candidate filter) monopolizes a frame on large vaults.
   await yielder();
 
+  let lastYield = performance.now();
   const { inbound, outbound } = buildLinkCounts(app);
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
   const issues: NoteIssue[] = [];
 
+  // Exclusion config is constant for the whole scan — normalize it once.
+  const exclusion = {
+    excludedFolders: config.excludedFolders,
+    excludedPaths: config.excludedPaths,
+    excludedTags: config.excludedTags,
+  };
+
   // Pass 1 (synchronous): filter to the notes we'll actually scan, capturing the
   // metadata cache we already have so pass 2 only does the async file reads.
   const candidates: { file: TFile; tags: string[]; frontmatter: Record<string, unknown> }[] = [];
-  for (const file of app.vault.getMarkdownFiles()) {
+  const markdownFiles = app.vault.getMarkdownFiles();
+  for (let f = 0; f < markdownFiles.length; f++) {
+    const file = markdownFiles[f];
+    // Yield periodically so building the candidate list can't block one long frame.
+    if ((f & 1023) === 0 && performance.now() - lastYield > 16) {
+      await yielder();
+      lastYield = performance.now();
+    }
     // Never scan our own exported reports (they'd self-flag as draft/stale).
     if (file.path === REPORT_FOLDER || file.path.startsWith(REPORT_FOLDER + "/")) continue;
     const cache = app.metadataCache.getFileCache(file);
     const tags = extractTags(cache);
-    if (
-      isExcluded(file.path, tags, {
-        excludedFolders: config.excludedFolders,
-        excludedPaths: config.excludedPaths,
-        excludedTags: config.excludedTags,
-      })
-    ) {
-      continue;
-    }
+    if (isExcluded(file.path, tags, exclusion)) continue;
     if (!includedByFolders(file.path, config.includedFolders)) continue;
     candidates.push({ file, tags, frontmatter: extractFrontmatter(cache) });
   }
 
   const totalFiles = candidates.length;
   onProgress?.(0, totalFiles);
-
-  let lastYield = performance.now();
 
   // Pass 2: read + detect in bounded-parallel batches, yielding between them.
   for (let i = 0; i < candidates.length; i += READ_BATCH) {

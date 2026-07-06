@@ -26,7 +26,6 @@
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-filters,
 .note-doctor-toolbar,
 .note-doctor-bulk-bar {
   display: flex;
@@ -34,24 +33,6 @@
   gap: var(--size-4-2);
   flex-wrap: wrap;
   margin-bottom: var(--size-4-2);
-}
-
-.note-doctor-chip {
-  padding: var(--size-2-1) var(--size-4-2);
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.note-doctor-chip:hover {
-  background: var(--background-modifier-hover);
-}
-
-.note-doctor-chip.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
 }
 
 .note-doctor-bulk-bar {
@@ -398,7 +379,8 @@ button.note-doctor-tile:hover {
 }
 
 .note-doctor-sev.is-high { background: var(--color-red); }
-.note-doctor-sev.is-med { background: var(--color-orange); }
+/* Orange is too light for white text; dark text keeps the "M" legible in both themes. */
+.note-doctor-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
 .note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-muted); }
 
 .note-doctor-row-folder {

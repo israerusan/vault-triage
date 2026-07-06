@@ -113,7 +113,12 @@ export class ProfileEditModal extends Modal {
   }
 
   private async submit(): Promise<void> {
-    const enabledIssueTypes = ISSUE_TYPES.filter((t) => this.enabledTypes.has(t));
+    let enabledIssueTypes = ISSUE_TYPES.filter((t) => this.enabledTypes.has(t));
+    // If the user turned every custom rule off, that means "no custom issues",
+    // not "run all" — so drop the custom type rather than inverting their intent.
+    if (this.ruleIds && this.ruleIds.size === 0) {
+      enabledIssueTypes = enabledIssueTypes.filter((t) => t !== "custom");
+    }
     if (enabledIssueTypes.length === 0) {
       new Notice("Select at least one issue type for this profile.");
       return;

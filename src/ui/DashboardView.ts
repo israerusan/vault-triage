@@ -28,6 +28,8 @@ export class NoteDoctorView extends ItemView {
   private bulkActionButtons: HTMLButtonElement[] = [];
   /** So a fresh scan adopts its profile's sort once, without fighting user changes. */
   private lastSyncedScanAt: string | null = null;
+  private sortCacheKey = "";
+  private sortCache: NoteIssue[] = [];
 
   async onClose(): Promise<void> {
     this.contentEl.empty();
@@ -75,7 +77,9 @@ export class NoteDoctorView extends ItemView {
 
     this.renderHeader(root);
 
-    if (this.plugin.scanning) {
+    // Only take over the whole panel on the FIRST scan; a re-scan keeps the
+    // results visible and shows progress inline (see renderMeta).
+    if (this.plugin.scanning && !this.plugin.lastResult) {
       this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
       this.renderScanningMeta();
       return;
@@ -115,7 +119,7 @@ export class NoteDoctorView extends ItemView {
     // second "nice and tidy" empty-state under it. (A filtered-empty view still
     // renders its own message.)
     if (issues.length > 0 || this.filter !== "all") {
-      renderResultsList(root.createDiv(), this.plugin, this.applyView(issues), {
+      renderResultsList(root.createDiv(), this.plugin, this.applyView(), {
         bulkMode: this.bulkMode,
         selected: this.selected,
         onSelectionChange: () => this.updateSelCount(),
@@ -238,11 +242,22 @@ export class NoteDoctorView extends ItemView {
 
     this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
     const last = this.plugin.lastResult;
-    if (last) {
+    if (this.plugin.scanning) {
+      this.summaryEl.setText(
+        this.plugin.scanTotal > 0
+          ? `Scanning ${this.plugin.scanDone} / ${this.plugin.scanTotal}…`
+          : "Scanning…"
+      );
+      const track = host.createDiv({ cls: "note-doctor-progress" });
+      this.progressEl = track.createDiv({ cls: "note-doctor-progress-bar" });
+      this.showScanProgress(this.plugin.scanDone, this.plugin.scanTotal);
+    } else if (last) {
       const issueWord = issues.length === 1 ? "issue" : "issues";
       const reviewed = reviewedCount > 0 ? ` · ${reviewedCount} reviewed` : "";
+      const filtered =
+        this.filter !== "all" ? ` · showing ${ISSUE_TYPE_LABELS[this.filter]}` : "";
       this.summaryEl.setText(
-        `${issues.length} ${issueWord}${reviewed} · scanned ${relativeTime(last.scannedAt)}`
+        `${issues.length} ${issueWord}${reviewed} · scanned ${relativeTime(last.scannedAt)}${filtered}`
       );
     }
 
@@ -335,7 +350,7 @@ export class NoteDoctorView extends ItemView {
       text: scoped ? `Review ${ISSUE_TYPE_LABELS[this.filter as IssueType]}` : "Review flagged",
     });
     review.addEventListener("click", () =>
-      this.plugin.openReviewQueue(this.applyView(this.plugin.visibleIssues()))
+      this.plugin.openReviewQueue(this.applyView())
     );
 
     const bulk = bar.createEl("button", { text: this.bulkMode ? "Exit bulk" : "Bulk actions" });
@@ -361,7 +376,7 @@ export class NoteDoctorView extends ItemView {
     this.selCountEl = bar.createSpan({ text: `${this.selected.size} selected` });
     this.bulkActionButtons = [];
 
-    const shown = this.applyView(this.plugin.visibleIssues());
+    const shown = this.applyView();
     const allSelected = shown.length > 0 && shown.every((i) => this.selected.has(i.id));
     const selectAll = bar.createEl("button", { text: allSelected ? "Select none" : "Select all" });
     selectAll.addEventListener("click", () => {
@@ -463,11 +478,24 @@ export class NoteDoctorView extends ItemView {
     });
   }
 
-  /** Apply the active filter and sort mode to the visible issues. */
-  private applyView(issues: NoteIssue[]): NoteIssue[] {
-    const filtered =
-      this.filter === "all" ? issues : issues.filter((i) => i.issueType === this.filter);
-    return sortIssues(filtered, this.sortMode);
+  /** The full result sorted once per (sortMode, scan) — filtering preserves order,
+   *  so tile/bulk toggles don't pay for a re-sort. */
+  private sortedIssues(): NoteIssue[] {
+    const last = this.plugin.lastResult;
+    const key = `${this.sortMode}|${last?.scannedAt ?? ""}`;
+    if (this.sortCacheKey !== key) {
+      this.sortCache = sortIssues(last?.issues ?? [], this.sortMode);
+      this.sortCacheKey = key;
+    }
+    return this.sortCache;
+  }
+
+  /** Sorted, not-ignored, filtered-by-active-type view of the current scan. */
+  private applyView(): NoteIssue[] {
+    return this.sortedIssues().filter(
+      (i) =>
+        !this.plugin.isIgnored(i) && (this.filter === "all" || i.issueType === this.filter)
+    );
   }
 }
 

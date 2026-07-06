@@ -127,7 +127,10 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Draft markers")
-      .setDesc("Comma-separated words that mark an unfinished note.")
+      .setDesc(
+        "Comma-separated tokens that mark an unfinished note. Matched as whole words, " +
+          "case-insensitively — pick distinctive tokens (avoid everyday words like \"draft\")."
+      )
       .addText((t) =>
         t
           .setPlaceholder("TODO, FIXME, WIP")
