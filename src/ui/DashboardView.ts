@@ -28,7 +28,8 @@ export class NoteDoctorView extends ItemView {
   private bulkActionButtons: HTMLButtonElement[] = [];
   /** So a fresh scan adopts its profile's sort once, without fighting user changes. */
   private lastSyncedScanAt: string | null = null;
-  private sortCacheKey = "";
+  private sortCacheMode: SortMode | null = null;
+  private sortCacheSrc: NoteIssue[] | null = null;
   private sortCache: NoteIssue[] = [];
 
   async onClose(): Promise<void> {
@@ -63,6 +64,10 @@ export class NoteDoctorView extends ItemView {
     if (this.progressEl) {
       const pct = total > 0 ? Math.round((done / total) * 100) : 0;
       this.progressEl.setCssStyles({ width: `${pct}%` });
+      this.progressEl.setAttribute("role", "progressbar");
+      this.progressEl.setAttribute("aria-valuemin", "0");
+      this.progressEl.setAttribute("aria-valuenow", String(done));
+      this.progressEl.setAttribute("aria-valuemax", String(total));
     }
   }
 
@@ -122,6 +127,7 @@ export class NoteDoctorView extends ItemView {
       renderResultsList(root.createDiv(), this.plugin, this.applyView(), {
         bulkMode: this.bulkMode,
         selected: this.selected,
+        showBadge: this.filter === "all",
         onSelectionChange: () => this.updateSelCount(),
         onCountsChanged: () => this.refreshMeta(),
       });
@@ -478,14 +484,15 @@ export class NoteDoctorView extends ItemView {
     });
   }
 
-  /** The full result sorted once per (sortMode, scan) — filtering preserves order,
-   *  so tile/bulk toggles don't pay for a re-sort. */
+  /** The full result sorted once — filtering preserves order, so tile/bulk toggles
+   *  don't pay for a re-sort. Keyed on the issues-array IDENTITY (not scannedAt),
+   *  so in-place reassignments (delete/exclude/rename) correctly invalidate it. */
   private sortedIssues(): NoteIssue[] {
-    const last = this.plugin.lastResult;
-    const key = `${this.sortMode}|${last?.scannedAt ?? ""}`;
-    if (this.sortCacheKey !== key) {
-      this.sortCache = sortIssues(last?.issues ?? [], this.sortMode);
-      this.sortCacheKey = key;
+    const src = this.plugin.lastResult?.issues ?? null;
+    if (this.sortCacheSrc !== src || this.sortCacheMode !== this.sortMode) {
+      this.sortCache = sortIssues(src ?? [], this.sortMode);
+      this.sortCacheSrc = src;
+      this.sortCacheMode = this.sortMode;
     }
     return this.sortCache;
   }

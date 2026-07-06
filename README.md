@@ -149,4 +149,5 @@ want to.
 
 ## Support
 
-If you run into a bug or want to suggest a feature, open an issue on GitHub.
+If you run into a bug or want to suggest a feature, open an issue at
+[github.com/israerusan/note-doctor](https://github.com/israerusan/note-doctor/issues).

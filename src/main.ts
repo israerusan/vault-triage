@@ -2,6 +2,7 @@ import {
   App,
   FuzzySuggestModal,
   Notice,
+  Platform,
   Plugin,
   TFile,
   WorkspaceLeaf,
@@ -465,10 +466,10 @@ export default class NoteDoctorPlugin extends Plugin {
 
   async revealNote(path: string): Promise<void> {
     await this.openNote(path);
+    if (Platform.isMobile) return; // no file explorer to reveal into on mobile
     // Reveal-in-file-explorer has no public API; feature-detect the internal
-    // command so a missing/renamed command (or mobile) degrades to just opening.
-    // Reveal is best-effort via a private command; wrap it so a shape/behavior
-    // change in a future Obsidian degrades to "note is already open".
+    // command (intentional, guarded private-API use) so a missing/renamed command
+    // degrades to just having opened the note.
     try {
       const commands = (this.app as unknown as AppInternals).commands;
       if (!commands) return;

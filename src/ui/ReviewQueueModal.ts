@@ -94,7 +94,8 @@ export class ReviewQueueModal extends Modal {
     this.actionButton(actions, "ban", "Exclude note (e)", () => void this.excludeCurrent());
     // Pro: fix the note without leaving the queue.
     const proSuffix = this.plugin.isPro ? "" : " — Pro";
-    this.actionButton(actions, "wand-2", `Add a property (p)${proSuffix}`, () =>
+    // "Add missing" is honest: it fills absent/empty properties, never overwrites.
+    this.actionButton(actions, "wand-2", `Add missing property (p)${proSuffix}`, () =>
       this.quickAddProperty()
     );
 
@@ -146,8 +147,12 @@ export class ReviewQueueModal extends Modal {
           void this.plugin
             .bulkAddProperty([issue.notePath], v.key.trim(), v.value)
             .then((changed) => {
-              // If the note was actually fixed, drop it from the queue and advance.
-              if (changed.length > 0) this.dropCurrent();
+              if (changed.length > 0) {
+                // Drop it from the queue and reconcile the dashboard (rescan runs
+                // behind the modal and refreshes it on close).
+                this.dropCurrent();
+                void this.plugin.settleCacheThenRescan(changed);
+              }
             });
         }
       ).open();

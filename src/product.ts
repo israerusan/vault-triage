@@ -26,6 +26,6 @@ export const PRO_UPSELL: Record<string, string> = {
   rules: "Custom rules are a Pro feature. " + PRO_TAGLINE,
   bulk: "Bulk actions are a Pro feature. " + PRO_TAGLINE,
   export: "Report export is a Pro feature. " + PRO_TAGLINE,
-  review: "Editing frontmatter without leaving the review queue is a Pro feature. " + PRO_TAGLINE,
+  review: "Adding missing frontmatter properties without leaving the review queue is a Pro feature. " + PRO_TAGLINE,
   severity: "Severity tuning is a Pro feature. " + PRO_TAGLINE,
 };

@@ -132,9 +132,17 @@
   color: var(--text-normal);
 }
 
-/* The destructive "ignore" action reads as danger on hover so it doesn't look
-   identical to the benign reviewed toggle right next to it. */
+/* The destructive "ignore" action is set apart (gap + a faint danger tint at rest)
+   and turns solid danger on hover, so it never reads like the benign reviewed
+   toggle right next to it. */
+.note-doctor-icon-btn.is-danger {
+  margin-left: var(--size-4-1);
+  color: var(--text-error);
+  opacity: 0.75;
+}
+
 .note-doctor-icon-btn.is-danger:hover {
+  opacity: 1;
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
 }
@@ -144,7 +152,9 @@
 /* Type badge is neutral so it doesn't compete with the severity chip's color —
    exactly one channel (severity) carries saturated hue. Type reads from its label. */
 .note-doctor-badge {
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 8em;
   padding: var(--size-2-1) var(--size-4-1);
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
@@ -152,6 +162,13 @@
   color: var(--text-muted);
   border: 1px solid var(--background-modifier-border);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep the note title readable in the narrow sidebar even next to a badge. */
+.note-doctor-row-main {
+  min-width: 6em;
 }
 
 .note-doctor-empty {
@@ -375,13 +392,14 @@ button.note-doctor-tile:hover {
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-bold);
-  color: #fff;
+  color: var(--text-on-accent);
 }
 
 .note-doctor-sev.is-high { background: var(--color-red); }
 /* Orange is too light for white text; dark text keeps the "M" legible in both themes. */
 .note-doctor-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
-.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-muted); }
+/* Neutral fill needs normal-weight text (not muted) so the "L" stays readable in dark themes. */
+.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-normal); }
 
 .note-doctor-row-folder {
   color: var(--text-faint);

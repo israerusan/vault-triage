@@ -1,4 +1,4 @@
-import { getAllTags, type App, type CachedMetadata, type TFile } from "obsidian";
+import { getAllTags, normalizePath, type App, type CachedMetadata, type TFile } from "obsidian";
 import { ISSUE_TYPES } from "../../types";
 import { REPORT_FOLDER } from "../../product";
 import type {
@@ -55,12 +55,15 @@ export async function scanVault(
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
   const issues: NoteIssue[] = [];
 
-  // Exclusion config is constant for the whole scan — normalize it once.
+  // Exclusion config is constant for the whole scan — normalize paths once so
+  // user input like "Archive/" or "./Archive" matches Obsidian's canonical form.
+  const normPath = (p: string): string => normalizePath(p).replace(/\/$/, "");
   const exclusion = {
-    excludedFolders: config.excludedFolders,
-    excludedPaths: config.excludedPaths,
+    excludedFolders: config.excludedFolders.map(normPath),
+    excludedPaths: config.excludedPaths.map(normPath),
     excludedTags: config.excludedTags,
   };
+  const includedFolders = config.includedFolders.map(normPath);
 
   // Pass 1 (synchronous): filter to the notes we'll actually scan, capturing the
   // metadata cache we already have so pass 2 only does the async file reads.
@@ -78,25 +81,29 @@ export async function scanVault(
     const cache = app.metadataCache.getFileCache(file);
     const tags = extractTags(cache);
     if (isExcluded(file.path, tags, exclusion)) continue;
-    if (!includedByFolders(file.path, config.includedFolders)) continue;
+    if (!includedByFolders(file.path, includedFolders)) continue;
     candidates.push({ file, tags, frontmatter: extractFrontmatter(cache) });
   }
 
   const totalFiles = candidates.length;
   onProgress?.(0, totalFiles);
 
-  // Pass 2: read + detect in bounded-parallel batches, yielding between them.
-  for (let i = 0; i < candidates.length; i += READ_BATCH) {
-    const batch = candidates.slice(i, i + READ_BATCH);
-    // A file removed/renamed between pass 1 and here rejects; let it drop out
-    // rather than aborting the whole scan.
-    const contents = await Promise.all(
-      batch.map((c) => app.vault.cachedRead(c.file).catch(() => null))
-    );
-    batch.forEach((c, j) => {
-      const content = contents[j];
-      if (content === null) return;
-      const stat = buildNoteStat({
+  // Only stale/orphan/missing-properties are wanted? Then no detector reads the
+  // body, so skip all file I/O — the biggest win for metadata-only scans.
+  const wantsThin = enabled.has("thin") && config.minNoteLength > 0;
+  const wantsMarkers =
+    (enabled.has("draft-marker") && config.draftMarkers.some((m) => m.trim().length > 0)) ||
+    (isPro &&
+      enabled.has("custom") &&
+      config.customRules.some((r) => r.enabled && r.condition.type === "has-marker"));
+  const needsContent = wantsThin || wantsMarkers;
+
+  const detect = (
+    c: { file: TFile; tags: string[]; frontmatter: Record<string, unknown> },
+    content: string
+  ): void => {
+    const stat = buildNoteStat(
+      {
         path: c.file.path,
         name: c.file.basename,
         mtime: c.file.stat.mtime,
@@ -105,53 +112,77 @@ export async function scanVault(
         tags: c.tags,
         inboundLinks: inbound.get(c.file.path) ?? 0,
         outboundLinks: outbound.get(c.file.path) ?? 0,
-      });
+      },
+      wantsThin
+    );
 
-      if (enabled.has("stale")) {
-        pushHit(issues, stat, "stale", config, staleDetector(stat, config.staleDaysThreshold, now));
-      }
-      if (enabled.has("thin")) {
-        pushHit(issues, stat, "thin", config, thinDetector(stat, config.minNoteLength));
-      }
-      if (enabled.has("orphan")) {
-        pushHit(issues, stat, "orphan", config, orphanDetector(stat));
-      }
-      if (enabled.has("missing-properties")) {
-        pushHit(
-          issues,
-          stat,
-          "missing-properties",
-          config,
-          missingPropertiesDetector(stat, config.requiredProperties)
-        );
-      }
-      if (enabled.has("draft-marker")) {
-        pushHit(issues, stat, "draft-marker", config, draftMarkerDetector(stat, config.draftMarkers));
-      }
-
-      if (isPro && enabled.has("custom") && config.customRules.length > 0) {
-        for (const hit of runCustomRules(stat, config.customRules, now)) {
-          issues.push({
-            id: issueKey(stat.path, "custom", hit.ruleId),
-            notePath: stat.path,
-            noteName: stat.name,
-            issueType: "custom",
-            severity: hit.severity,
-            reason: hit.reason,
-            sourceRuleId: hit.ruleId,
-          });
-        }
-      }
-    });
-    onProgress?.(Math.min(i + READ_BATCH, totalFiles), totalFiles);
-    // Yield only when we've held the main thread a frame's worth, so the UI can
-    // paint/stay responsive — but warm rescans (cachedRead resolves on the
-    // microtask queue) don't pay a fixed per-batch tax. A MessageChannel yield
-    // isn't subject to the nested-setTimeout 4ms clamp.
-    if (performance.now() - lastYield > 16) {
-      await yielder();
-      lastYield = performance.now();
+    if (enabled.has("stale")) {
+      pushHit(issues, stat, "stale", config, staleDetector(stat, config.staleDaysThreshold, now));
     }
+    if (enabled.has("thin")) {
+      pushHit(issues, stat, "thin", config, thinDetector(stat, config.minNoteLength));
+    }
+    if (enabled.has("orphan")) {
+      pushHit(issues, stat, "orphan", config, orphanDetector(stat));
+    }
+    if (enabled.has("missing-properties")) {
+      pushHit(
+        issues,
+        stat,
+        "missing-properties",
+        config,
+        missingPropertiesDetector(stat, config.requiredProperties)
+      );
+    }
+    if (enabled.has("draft-marker")) {
+      pushHit(issues, stat, "draft-marker", config, draftMarkerDetector(stat, config.draftMarkers));
+    }
+
+    if (isPro && enabled.has("custom") && config.customRules.length > 0) {
+      for (const hit of runCustomRules(stat, config.customRules, now)) {
+        issues.push({
+          id: issueKey(stat.path, "custom", hit.ruleId),
+          notePath: stat.path,
+          noteName: stat.name,
+          issueType: "custom",
+          severity: hit.severity,
+          reason: hit.reason,
+          sourceRuleId: hit.ruleId,
+        });
+      }
+    }
+  };
+
+  if (needsContent) {
+    // Pass 2: read + detect in bounded-parallel batches, yielding between them.
+    for (let i = 0; i < candidates.length; i += READ_BATCH) {
+      const batch = candidates.slice(i, i + READ_BATCH);
+      // A file removed/renamed between pass 1 and here rejects; drop it rather
+      // than aborting the whole scan.
+      const contents = await Promise.all(
+        batch.map((c) => app.vault.cachedRead(c.file).catch(() => null))
+      );
+      batch.forEach((c, j) => {
+        const content = contents[j];
+        if (content !== null) detect(c, content);
+      });
+      onProgress?.(Math.min(i + READ_BATCH, totalFiles), totalFiles);
+      if (performance.now() - lastYield > 16) {
+        await yielder();
+        lastYield = performance.now();
+      }
+    }
+  } else {
+    // Metadata-only scan: no reads at all.
+    for (let i = 0; i < candidates.length; i++) {
+      detect(candidates[i], "");
+      if ((i & 1023) === 0 && performance.now() - lastYield > 16) {
+        onProgress?.(i, totalFiles);
+        await yielder();
+        lastYield = performance.now();
+      }
+    }
+    onProgress?.(totalFiles, totalFiles);
   }
 
   return { issues: sortIssues(issues, config.sortMode), totalFiles };

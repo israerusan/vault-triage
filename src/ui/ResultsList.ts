@@ -6,6 +6,8 @@ import { ISSUE_TYPE_LABELS } from "../types";
 export interface ResultsListOptions {
   bulkMode: boolean;
   selected: Set<string>;
+  /** Hide the per-row type badge (redundant when a single type is filtered). */
+  showBadge: boolean;
   onSelectionChange: () => void;
   /** Called after an in-place mutation so the header counts can refresh cheaply. */
   onCountsChanged: () => void;
@@ -97,10 +99,12 @@ function renderRow(
   const tierEl = row.createSpan({ cls: `note-doctor-sev ${tier.cls}`, text: tier.label[0] });
   tierEl.setAttribute("aria-label", `${tier.label} severity`);
 
-  row.createSpan({
-    cls: `note-doctor-badge is-${issue.issueType}`,
-    text: ISSUE_TYPE_LABELS[issue.issueType],
-  });
+  if (opts.showBadge) {
+    row.createSpan({
+      cls: `note-doctor-badge is-${issue.issueType}`,
+      text: ISSUE_TYPE_LABELS[issue.issueType],
+    });
+  }
 
   const main = row.createDiv({ cls: "note-doctor-row-main" });
   const title = main.createEl("button", { cls: "note-doctor-row-title", text: issue.noteName });
