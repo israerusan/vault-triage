@@ -109,7 +109,7 @@ Writing Vault Audit, or Project Notes Audit.
 
 - Notes in `Projects/` must have `status`
 - Notes tagged `#project` must have `due`
-- Draft notes older than 30 days are high priority
+- Notes in `Drafts/` older than 30 days (high priority)
 
 **Bulk actions** — apply safe actions across many flagged notes: ignore, mark
 reviewed, add a property, add a tag, or export the selection to a report.

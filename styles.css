@@ -404,15 +404,15 @@ button.note-doctor-tile:hover {
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-bold);
-  /* Neutral fill + colored LETTER: theme-safe (no hardcoded text-on-color hex) and
-     accessible — the H/M/L letter carries the tier even if hue is imperceptible. */
-  background: var(--background-modifier-border);
-  color: var(--text-muted);
+  /* Saturated fill with a contrast-correct label (dark on the light orange, light
+     on the dark red). The H/M/L letter is the non-color channel, so the tier still
+     reads without relying on hue. --color-* are saturated in both light and dark. */
+  color: #fff;
 }
 
-.note-doctor-sev.is-high { color: var(--color-red); }
-.note-doctor-sev.is-med { color: var(--color-orange); }
-.note-doctor-sev.is-low { color: var(--text-muted); }
+.note-doctor-sev.is-high { background: var(--color-red); }
+.note-doctor-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
+.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-normal); }
 
 .note-doctor-row-folder {
   color: var(--text-faint);

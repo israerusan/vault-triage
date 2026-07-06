@@ -25,6 +25,7 @@ export class NoteDoctorView extends ItemView {
   private summaryEl: HTMLElement | null = null;
   private progressEl: HTMLElement | null = null;
   private selCountEl: HTMLElement | null = null;
+  private resultsEl: HTMLElement | null = null;
   private bulkActionButtons: HTMLButtonElement[] = [];
   /** So a fresh scan adopts its profile's sort once, without fighting user changes. */
   private lastSyncedScanAt: string | null = null;
@@ -79,6 +80,7 @@ export class NoteDoctorView extends ItemView {
     this.summaryEl = null;
     this.progressEl = null;
     this.selCountEl = null;
+    this.resultsEl = null;
 
     this.renderHeader(root);
 
@@ -103,10 +105,14 @@ export class NoteDoctorView extends ItemView {
     }
 
     const last = this.plugin.lastResult;
-    // A newly-completed scan adopts its (profile's) sort mode once.
+    // A newly-completed scan adopts its (profile's) sort mode once, and seeds the
+    // sort cache — scanVault already returned the issues sorted in this mode.
     if (last && last.scannedAt !== this.lastSyncedScanAt) {
       this.sortMode = last.sortMode;
       this.lastSyncedScanAt = last.scannedAt;
+      this.sortCacheSrc = last.issues;
+      this.sortCacheMode = last.sortMode;
+      this.sortCache = last.issues;
     }
 
     const issues = this.plugin.visibleIssues();
@@ -125,7 +131,8 @@ export class NoteDoctorView extends ItemView {
     // second "nice and tidy" empty-state under it. (A filtered-empty view still
     // renders its own message.)
     if (issues.length > 0 || this.filter !== "all") {
-      renderResultsList(root.createDiv(), this.plugin, this.applyView(), {
+      this.resultsEl = root.createDiv();
+      renderResultsList(this.resultsEl, this.plugin, this.applyView(), {
         bulkMode: this.bulkMode,
         selected: this.selected,
         showBadge: this.filter === "all",
@@ -160,10 +167,12 @@ export class NoteDoctorView extends ItemView {
       const select = header.createEl("select", { cls: "dropdown note-doctor-profile-select" });
       select.createEl("option", { text: "Run a profile…", value: "" });
       for (const p of profiles) select.createEl("option", { text: p.name, value: p.id });
+      // Keep the active profile selected so a scoped result stays identifiable.
+      const activeId = this.plugin.lastResult?.profileId;
+      if (activeId && profiles.some((p) => p.id === activeId)) select.value = activeId;
       select.disabled = this.plugin.scanning;
       select.addEventListener("change", () => {
         if (select.value) void this.plugin.runScan(select.value);
-        select.value = "";
       });
     }
   }
@@ -263,8 +272,12 @@ export class NoteDoctorView extends ItemView {
       const reviewed = reviewedCount > 0 ? ` · ${reviewedCount} reviewed` : "";
       const filtered =
         this.filter !== "all" ? ` · showing ${ISSUE_TYPE_LABELS[this.filter]}` : "";
+      const profile = last.profileId
+        ? this.plugin.settings.savedProfiles.find((p) => p.id === last.profileId)
+        : undefined;
+      const via = profile ? ` · via ${profile.name}` : "";
       this.summaryEl.setText(
-        `${issues.length} ${issueWord}${reviewed} · scanned ${relativeTime(last.scannedAt)}${filtered}`
+        `${issues.length} ${issueWord}${reviewed} · scanned ${relativeTime(last.scannedAt)}${via}${filtered}`
       );
     }
 
@@ -401,12 +414,23 @@ export class NoteDoctorView extends ItemView {
     this.bulkActionButtons = [];
 
     const shown = this.applyView();
-    const allSelected = shown.length > 0 && shown.every((i) => this.selected.has(i.id));
-    const selectAll = bar.createEl("button", { text: allSelected ? "Select none" : "Select all" });
+    const startAllSelected = shown.length > 0 && shown.every((i) => this.selected.has(i.id));
+    const selectAll = bar.createEl("button", {
+      text: startAllSelected ? "Select none" : "Select all",
+    });
     selectAll.addEventListener("click", () => {
-      if (allSelected) shown.forEach((i) => this.selected.delete(i.id));
+      const nowAll = shown.length > 0 && shown.every((i) => this.selected.has(i.id));
+      if (nowAll) shown.forEach((i) => this.selected.delete(i.id));
       else shown.forEach((i) => this.selected.add(i.id));
-      this.render();
+      // Update the rendered checkboxes in place (don't rebuild — that would reset
+      // pagination). Rows shown so far are a subset of `shown`.
+      if (this.resultsEl) {
+        this.resultsEl.querySelectorAll("input.note-doctor-check").forEach((el) => {
+          (el as HTMLInputElement).checked = !nowAll;
+        });
+      }
+      selectAll.setText(nowAll ? "Select all" : "Select none");
+      this.updateSelCount();
     });
 
     // Scope to the currently-visible (filtered) view so bulk writes can only ever

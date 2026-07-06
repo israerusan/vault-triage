@@ -51,8 +51,12 @@ export async function scanVault(
   await yielder();
 
   let lastYield = performance.now();
-  const { inbound, outbound } = buildLinkCounts(app);
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
+  // The inbound/outbound link graph is read ONLY by the orphan detector — skip the
+  // whole-vault graph walk when orphan detection is off.
+  const { inbound, outbound } = enabled.has("orphan")
+    ? buildLinkCounts(app)
+    : { inbound: new Map<string, number>(), outbound: new Map<string, number>() };
   const issues: NoteIssue[] = [];
 
   // Exclusion config is constant for the whole scan — normalize paths once so

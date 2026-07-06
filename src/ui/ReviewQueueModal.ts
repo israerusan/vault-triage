@@ -93,11 +93,14 @@ export class ReviewQueueModal extends Modal {
     this.actionButton(actions, "eye-off", "Ignore (i)", () => void this.ignoreCurrent());
     this.actionButton(actions, "ban", "Exclude note (e)", () => void this.excludeCurrent());
     // Pro: fix the note without leaving the queue.
-    const proSuffix = this.plugin.isPro ? "" : " — Pro";
-    // "Add missing" is honest: it fills absent/empty properties, never overwrites.
-    this.actionButton(actions, "wand-2", `Add missing property (p)${proSuffix}`, () =>
-      this.quickAddProperty()
-    );
+    // The property quick-fix only resolves missing-properties (and custom) issues,
+    // so only offer it there instead of on every card.
+    if (issue.issueType === "missing-properties" || issue.issueType === "custom") {
+      const proSuffix = this.plugin.isPro ? "" : " — Pro";
+      this.actionButton(actions, "wand-2", `Add missing property (p)${proSuffix}`, () =>
+        this.quickAddProperty()
+      );
+    }
 
     contentEl.createDiv({
       cls: "note-doctor-review-legend",
@@ -148,13 +151,14 @@ export class ReviewQueueModal extends Modal {
         ],
         (v) => {
           if (!v.key.trim()) return;
+          const target = issue;
           void this.plugin
-            .bulkAddProperty([issue.notePath], v.key.trim(), v.value)
+            .bulkAddProperty([target.notePath], v.key.trim(), v.value)
             .then((changed) => {
               if (changed.length > 0) {
-                // Drop it from the queue and reconcile the dashboard (rescan runs
-                // behind the modal and refreshes it on close).
-                this.dropCurrent();
+                // Drop by IDENTITY (the user may have navigated during the write),
+                // and reconcile the dashboard (rescan runs behind the modal).
+                this.dropIssue(target);
                 void this.plugin.settleCacheThenRescan(changed);
               }
             });
@@ -193,7 +197,13 @@ export class ReviewQueueModal extends Modal {
   }
 
   private dropCurrent(): void {
-    this.queue.splice(this.index, 1);
+    this.dropIssue(this.current());
+  }
+
+  /** Remove a specific issue from the queue (identity-based, safe across awaits). */
+  private dropIssue(target: NoteIssue | null): void {
+    if (!target) return;
+    this.queue = this.queue.filter((i) => i !== target);
     if (this.index >= this.queue.length) this.index = Math.max(0, this.queue.length - 1);
     if (this.queue.length === 0) {
       new Notice("Note Doctor: review complete.");

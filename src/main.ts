@@ -301,12 +301,17 @@ export default class NoteDoctorPlugin extends Plugin {
       const scannedAt = new Date(now).toISOString();
 
       this.lastResult = { issues, totalFiles, scannedAt, profileId, sortMode: config.sortMode };
+      // Summary reflects OUTSTANDING issues (ignored + reviewed removed), matching
+      // the live dashboard hero — so the post-restart hero doesn't overstate.
+      const outstanding = issues.filter(
+        (i) => !this.ignoredSet.has(i.id) && !this.reviewedSet.has(i.id)
+      );
       this.settings.lastScanSummary = {
         scannedAt,
         totalFiles,
-        totalIssues: issues.length,
-        affectedNotes: new Set(issues.map((i) => i.notePath)).size,
-        byType: countByType(issues),
+        totalIssues: outstanding.length,
+        affectedNotes: new Set(outstanding.map((i) => i.notePath)).size,
+        byType: countByType(outstanding),
         profileId,
       };
       this.settings.onboardingDismissed = true;
@@ -314,8 +319,11 @@ export default class NoteDoctorPlugin extends Plugin {
       if (!profileId) this.pruneKeys();
       await this.saveSettings();
 
-      const visible = this.visibleIssues().length;
-      new Notice(`${PRODUCT_NAME}: ${visible} issue(s) across ${totalFiles} note(s).`);
+      const affected = new Set(outstanding.map((i) => i.notePath)).size;
+      new Notice(
+        `${PRODUCT_NAME}: scanned ${totalFiles} ${plural(totalFiles, "note")} — ` +
+          `${outstanding.length} ${plural(outstanding.length, "issue")} in ${affected} ${plural(affected, "note")}.`
+      );
     } catch (err) {
       console.error("Note Doctor: scan failed", err);
       new Notice("Note Doctor: scan failed. See the console for details.");
@@ -593,7 +601,7 @@ export default class NoteDoctorPlugin extends Plugin {
       try {
         await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
           if (isMeaningful(fm[key])) return;
-          fm[key] = value;
+          fm[key] = coerceValue(value);
           didSet = true;
         });
       } catch (err) {
@@ -700,7 +708,8 @@ export default class NoteDoctorPlugin extends Plugin {
       new Notice("Note Doctor: run a scan before exporting a report.");
       return;
     }
-    const list = issues ?? this.visibleIssues();
+    // Default export = outstanding (exclude reviewed), matching "Export selected".
+    const list = issues ?? this.visibleIssues().filter((i) => !this.isReviewed(i));
     const profile = this.lastResult.profileId
       ? this.settings.savedProfiles.find((p) => p.id === this.lastResult?.profileId)
       : undefined;
@@ -766,6 +775,20 @@ class ProfileSuggestModal extends FuzzySuggestModal<ScanProfile> {
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+/** Simple pluralizer: plural(1, "note") → "note", plural(3, "note") → "notes". */
+function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`;
+}
+
+/** Coerce obvious scalar text so bulk-added properties get sensible YAML types. */
+function coerceValue(value: string): string | number | boolean {
+  const t = value.trim();
+  if (t === "true") return true;
+  if (t === "false") return false;
+  if (/^-?\d+(\.\d+)?$/.test(t) && String(Number(t)) === t) return Number(t);
+  return value;
 }
 
 /** Basename of a vault path, without the trailing `.md`. */
