@@ -159,6 +159,9 @@ export interface NoteDoctorSettings {
 
   severityWeights: Record<IssueType, number>;
 
+  /** Persisted dashboard sort, so a plain re-scan keeps the user's choice. */
+  sortMode: SortMode;
+
   savedProfiles: ScanProfile[];
   customRules: CustomRule[];
 

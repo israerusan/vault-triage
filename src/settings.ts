@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: NoteDoctorSettings = {
     "draft-marker": 2,
     custom: 3,
   },
+  sortMode: "severity",
   savedProfiles: [],
   customRules: [],
   onboardingDismissed: false,
@@ -60,8 +61,19 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
     this.renderProfilesSection();
   }
 
-  private async save(): Promise<void> {
+  /** Debounced save for field edits (coalesces per-keystroke writes). */
+  private save(): Promise<void> {
+    this.plugin.queueSave();
+    return Promise.resolve();
+  }
+
+  /** Immediate save for discrete actions (license validate/clear). */
+  private async saveNow(): Promise<void> {
     await this.plugin.saveSettings();
+  }
+
+  hide(): void {
+    this.plugin.flushPendingSave();
   }
 
   // --- Scan thresholds ------------------------------------------------------
@@ -168,6 +180,22 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
             await this.save();
           })
       );
+
+    const ignoredCount = this.plugin.ignoredCount();
+    new Setting(containerEl)
+      .setName("Ignored results")
+      .setDesc(
+        ignoredCount > 0
+          ? `${ignoredCount} result(s) hidden via "Ignore". Clear to bring them back on the next scan.`
+          : "Results you ignore are hidden here. Nothing ignored yet."
+      )
+      .addButton((b) => {
+        b.setButtonText("Clear ignored").setDisabled(ignoredCount === 0);
+        b.onClick(async () => {
+          await this.plugin.clearIgnored();
+          this.display();
+        });
+      });
   }
 
   // --- License --------------------------------------------------------------
@@ -185,7 +213,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
           b.setButtonText("Clear license").onClick(async () => {
             s.licenseKey = "";
             this.plugin.refreshLicense();
-            await this.save();
+            await this.saveNow();
             this.display();
           })
         );
@@ -220,7 +248,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
           }
           s.licenseKey = draft;
           this.plugin.refreshLicense();
-          await this.save();
+          await this.saveNow();
           new Notice(`${PRO_NAME} unlocked.`);
           this.display();
         })

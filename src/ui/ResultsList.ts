@@ -1,4 +1,4 @@
-import { Menu, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
 import type NoteDoctorPlugin from "../main";
 import type { NoteIssue } from "../types";
 import { ISSUE_TYPE_LABELS } from "../types";
@@ -133,12 +133,22 @@ function renderRow(
     });
   });
 
-  iconButton(actions, "eye-off", "Ignore this result", () => {
+  const ignoreBtn = iconButton(actions, "eye-off", "Ignore this result", () => {
     void plugin.setIgnored(issue, true).then(() => {
       row.remove();
       opts.onCountsChanged();
+      // Offer a one-click undo so an accidental ignore isn't a silent one-way trip.
+      const frag = createFragment((f) => {
+        f.appendText(`Ignored "${issue.noteName}". `);
+        const undo = f.createEl("a", { text: "Undo", cls: "note-doctor-inline-link" });
+        undo.addEventListener("click", () => {
+          void plugin.setIgnored(issue, false).then(() => plugin.refreshViews());
+        });
+      });
+      new Notice(frag, 6000);
     });
   });
+  ignoreBtn.addClass("is-danger");
 
   iconButton(actions, "more-horizontal", "More actions", (evt) => {
     const menu = new Menu();

@@ -45,6 +45,11 @@ export async function scanVault(
   now: number,
   onProgress?: ScanProgress
 ): Promise<ScanResult> {
+  const yielder = makeYielder();
+  // Let the "Scanning…" state paint before the synchronous pre-read (link map +
+  // candidate filter) monopolizes a frame on large vaults.
+  await yielder();
+
   const { inbound, outbound } = buildLinkCounts(app);
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
   const issues: NoteIssue[] = [];
@@ -73,7 +78,6 @@ export async function scanVault(
   const totalFiles = candidates.length;
   onProgress?.(0, totalFiles);
 
-  const yielder = makeYielder();
   let lastYield = performance.now();
 
   // Pass 2: read + detect in bounded-parallel batches, yielding between them.
@@ -179,7 +183,7 @@ export function resolveScanConfig(
     excludedTags: settings.excludedTags,
     severityWeights: settings.severityWeights,
     customRules: settings.customRules,
-    sortMode: "severity",
+    sortMode: settings.sortMode ?? "severity",
   };
   if (!profile) return base;
 

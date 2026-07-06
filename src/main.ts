@@ -514,42 +514,49 @@ export default class NoteDoctorPlugin extends Plugin {
   }
 
   /**
-   * Add a frontmatter property only to notes where the key is ABSENT. An existing
-   * value — even a deliberately empty one (`status: ""`, `aliases: []`) — is never
-   * touched; a cleanup tool must not clobber user data. Reports set vs. skipped.
+   * Add a frontmatter property only to notes where it is ABSENT or empty (matching
+   * the detector's `isMeaningful`), never clobbering a real value. An empty input
+   * value is rejected up front (writing `key: ""` wouldn't clear the flag anyway).
+   * Returns the paths actually changed so the caller can rescan them.
    */
-  async bulkAddProperty(paths: string[], key: string, value: string): Promise<void> {
-    let set = 0;
+  async bulkAddProperty(paths: string[], key: string, value: string): Promise<string[]> {
+    if (!isMeaningful(value)) {
+      new Notice("Note Doctor: enter a value for the property.");
+      return [];
+    }
+    const changed: string[] = [];
     let skipped = 0;
     for (const path of unique(paths)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
+      let didSet = false;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        // Match the detector's notion of "present": fill absent AND empty values
-        // (`status:` / `status: ""`), skip only meaningful ones.
-        if (isMeaningful(fm[key])) {
-          skipped++;
-        } else {
-          fm[key] = value;
-          set++;
-        }
+        if (isMeaningful(fm[key])) return;
+        fm[key] = value;
+        didSet = true;
       });
+      if (didSet) changed.push(path);
+      else skipped++;
     }
     const tail = skipped > 0 ? ` (${skipped} already had it)` : "";
-    new Notice(`${PRODUCT_NAME}: set "${key}" on ${set} note(s)${tail}.`);
+    new Notice(`${PRODUCT_NAME}: set "${key}" on ${changed.length} note(s)${tail}.`);
+    return changed;
   }
 
-  async bulkAddTag(paths: string[], tag: string): Promise<void> {
+  /** Append a tag to notes that lack it. Returns the paths actually changed. */
+  async bulkAddTag(paths: string[], tag: string): Promise<string[]> {
     const clean = tag.replace(/^#/, "").trim();
-    if (!clean) return;
-    let count = 0;
+    if (!clean) return [];
+    const changed: string[] = [];
     for (const path of unique(paths)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
+      let added = false;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         const existing = fm.tags;
         // A scalar `tags: reading, todo` is two tags to Obsidian — split it the
-        // same way so we append rather than mangling it into one comma'd tag.
+        // same way. Leave any unexpected shape (number/object) untouched.
+        if (existing != null && !Array.isArray(existing) && typeof existing !== "string") return;
         const tags: string[] = Array.isArray(existing)
           ? existing.map((t) => String(t))
           : typeof existing === "string"
@@ -558,12 +565,57 @@ export default class NoteDoctorPlugin extends Plugin {
                 .map((t) => t.replace(/^#/, "").trim())
                 .filter((t) => t.length > 0)
             : [];
-        if (!tags.includes(clean)) tags.push(clean);
+        if (tags.includes(clean)) return;
+        tags.push(clean);
         fm.tags = tags;
+        added = true;
       });
-      count++;
+      if (added) changed.push(path);
     }
-    new Notice(`${PRODUCT_NAME}: added #${clean} to ${count} note(s).`);
+    new Notice(`${PRODUCT_NAME}: added #${clean} to ${changed.length} note(s).`);
+    return changed;
+  }
+
+  /** Wait for the metadata cache to reparse the given paths, then re-scan. */
+  async settleCacheThenRescan(paths: string[]): Promise<void> {
+    if (paths.length > 0) await this.awaitCacheChanges(paths);
+    await this.runScan(this.lastResult?.profileId);
+  }
+
+  /** Resolve once the metadata cache has emitted `changed` for every path (or 2s). */
+  private awaitCacheChanges(paths: string[]): Promise<void> {
+    const pending = new Set(paths);
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        this.app.metadataCache.offref(ref);
+        window.clearTimeout(timer);
+        resolve();
+      };
+      const ref = this.app.metadataCache.on("changed", (file) => {
+        pending.delete(file.path);
+        if (pending.size === 0) finish();
+      });
+      const timer = window.setTimeout(finish, 2000);
+    });
+  }
+
+  /** Public debounced-save hook for the settings tab's field edits. */
+  queueSave(): void {
+    this.scheduleSave();
+  }
+
+  /** Clear all ignored results (recover from accidental ignores). */
+  async clearIgnored(): Promise<void> {
+    this.ignoredSet.clear();
+    await this.saveSettings();
+    this.refreshViews();
+  }
+
+  ignoredCount(): number {
+    return this.ignoredSet.size;
   }
 
   // --- Pro: report export ---------------------------------------------------

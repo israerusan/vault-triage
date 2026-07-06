@@ -82,12 +82,13 @@ export class NoteDoctorView extends ItemView {
 
     if (!this.plugin.lastResult) {
       if (!this.plugin.settings.onboardingDismissed) {
+        // First run: let the scan prove value before any paywall.
         this.renderOnboarding(root);
       } else {
         this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
         this.renderHydratedMeta(root);
+        if (!this.plugin.isPro) this.renderProCta(root);
       }
-      if (!this.plugin.isPro) this.renderProCta(root);
       return;
     }
 
@@ -241,7 +242,10 @@ export class NoteDoctorView extends ItemView {
     if (issues.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
       const nudge = host.createDiv({ cls: "note-doctor-nudge" });
       nudge.appendText("Also catch notes missing metadata? ");
-      const link = nudge.createEl("a", { cls: "note-doctor-inline-link", text: "Check for a required property" });
+      const link = nudge.createEl("button", {
+        cls: "note-doctor-inline-link",
+        text: "Check for a required property",
+      });
       link.addEventListener("click", () => {
         this.plugin.settings.requiredProperties = ["tags"];
         void this.plugin.saveSettings().then(() => this.plugin.runScan(this.plugin.lastResult?.profileId));
@@ -302,6 +306,9 @@ export class NoteDoctorView extends ItemView {
     }
     sort.addEventListener("change", () => {
       this.sortMode = sort.value as SortMode;
+      // Persist so a plain re-scan keeps this choice instead of resetting.
+      this.plugin.settings.sortMode = this.sortMode;
+      this.plugin.queueSave();
       this.render();
     });
 
@@ -358,7 +365,7 @@ export class NoteDoctorView extends ItemView {
             const paths = selectedIssues().map((i) => i.notePath);
             void this.plugin
               .bulkAddProperty(paths, v.key.trim(), v.value)
-              .then(() => this.afterBulkMutate());
+              .then((changed) => this.afterBulkMutate(changed));
           }
         }
       ).open();
@@ -371,7 +378,7 @@ export class NoteDoctorView extends ItemView {
         (v) => {
           if (v.tag.trim()) {
             const paths = selectedIssues().map((i) => i.notePath);
-            void this.plugin.bulkAddTag(paths, v.tag.trim()).then(() => this.afterBulkMutate());
+            void this.plugin.bulkAddTag(paths, v.tag.trim()).then((changed) => this.afterBulkMutate(changed));
           }
         }
       ).open();
@@ -389,11 +396,16 @@ export class NoteDoctorView extends ItemView {
     this.render();
   }
 
-  /** After a file-mutating bulk action, re-scan so the fixed notes drop off. */
-  private afterBulkMutate(): void {
+  /** After a file-mutating bulk action, wait for the cache then re-scan so the
+   *  fixed notes drop off. Skips the rescan when nothing actually changed. */
+  private afterBulkMutate(changed: string[]): void {
     this.selected.clear();
     this.bulkMode = false;
-    void this.plugin.runScan(this.plugin.lastResult?.profileId);
+    if (changed.length === 0) {
+      this.render();
+      return;
+    }
+    void this.plugin.settleCacheThenRescan(changed);
   }
 
   private renderProCta(root: HTMLElement): void {

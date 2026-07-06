@@ -151,26 +151,27 @@
   color: var(--text-normal);
 }
 
+/* The destructive "ignore" action reads as danger on hover so it doesn't look
+   identical to the benign reviewed toggle right next to it. */
+.note-doctor-icon-btn.is-danger:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
 /* Issue-type badge */
 
+/* Type badge is neutral so it doesn't compete with the severity chip's color —
+   exactly one channel (severity) carries saturated hue. Type reads from its label. */
 .note-doctor-badge {
   flex-shrink: 0;
   padding: var(--size-2-1) var(--size-4-1);
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
-  /* Fixed light text — the --color-* fills are saturated in both themes, so we
-     can't rely on --text-on-accent (which tracks the theme accent, not these). */
-  color: #fff;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
   white-space: nowrap;
 }
-
-.note-doctor-badge.is-stale { background: var(--color-orange); }
-/* Yellow is too light for white text; pin dark text so it's legible in BOTH themes. */
-.note-doctor-badge.is-thin { background: var(--color-yellow); color: #1f1f1f; }
-.note-doctor-badge.is-orphan { background: var(--color-purple); }
-.note-doctor-badge.is-missing-properties { background: var(--color-red); }
-.note-doctor-badge.is-draft-marker { background: var(--color-blue); }
-.note-doctor-badge.is-custom { background: var(--color-green); }
 
 .note-doctor-empty {
   color: var(--text-muted);
@@ -415,6 +416,12 @@ button.note-doctor-tile:hover {
 }
 
 .note-doctor-inline-link {
+  appearance: none;
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  font: inherit;
   cursor: pointer;
   color: var(--text-accent);
   text-decoration: underline;

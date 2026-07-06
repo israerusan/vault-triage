@@ -93,7 +93,10 @@ export class ReviewQueueModal extends Modal {
     this.actionButton(actions, "eye-off", "Ignore (i)", () => void this.ignoreCurrent());
     this.actionButton(actions, "ban", "Exclude note (e)", () => void this.excludeCurrent());
     // Pro: fix the note without leaving the queue.
-    this.actionButton(actions, "wand-2", "Add a property (p) — Pro", () => this.quickAddProperty());
+    const proSuffix = this.plugin.isPro ? "" : " — Pro";
+    this.actionButton(actions, "wand-2", `Add a property (p)${proSuffix}`, () =>
+      this.quickAddProperty()
+    );
 
     contentEl.createDiv({
       cls: "note-doctor-review-legend",
