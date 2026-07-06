@@ -16,7 +16,7 @@ interface SeverityTier {
   label: string;
 }
 
-/** Tiers are reachable on a default free scan (weights top out at 3). */
+/** High (>=3) is reachable on a default scan (draft-marker weight is 3). */
 function severityTier(severity: number): SeverityTier {
   if (severity >= 3) return { cls: "is-high", label: "High" };
   if (severity >= 2) return { cls: "is-med", label: "Medium" };

@@ -169,6 +169,8 @@ export interface NoteDoctorSettings {
 
   /** First-run onboarding flag. */
   onboardingDismissed: boolean;
+  /** Whether the free user dismissed the persistent Pro CTA card. */
+  proCtaDismissed: boolean;
 }
 
 /** Just the knobs a scan needs; a profile can override these at run time. */

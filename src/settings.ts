@@ -27,13 +27,16 @@ export const DEFAULT_SETTINGS: NoteDoctorSettings = {
     thin: 1,
     orphan: 2,
     "missing-properties": 3,
-    "draft-marker": 2,
+    // 3 so the High tier is reachable on a default free scan (draft markers are
+    // deliberate tokens, so an unfinished note is a high-signal "fix next").
+    "draft-marker": 3,
     custom: 3,
   },
   sortMode: "severity",
   savedProfiles: [],
   customRules: [],
   onboardingDismissed: false,
+  proCtaDismissed: false,
 };
 
 /** Split a comma/newline separated field into trimmed, non-empty entries. */

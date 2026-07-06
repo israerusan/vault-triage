@@ -25,6 +25,7 @@ export class NoteDoctorView extends ItemView {
   private summaryEl: HTMLElement | null = null;
   private progressEl: HTMLElement | null = null;
   private selCountEl: HTMLElement | null = null;
+  private bulkActionButtons: HTMLButtonElement[] = [];
   /** So a fresh scan adopts its profile's sort once, without fighting user changes. */
   private lastSyncedScanAt: string | null = null;
 
@@ -135,6 +136,14 @@ export class NoteDoctorView extends ItemView {
     btn.disabled = this.plugin.scanning;
     btn.addEventListener("click", () => void this.plugin.runScan());
 
+    if (!this.plugin.isPro && this.plugin.settings.proCtaDismissed) {
+      header.createEl("a", {
+        text: "Upgrade to Pro",
+        cls: "note-doctor-header-upsell",
+        href: PURCHASE_URL,
+      });
+    }
+
     const profiles = this.plugin.settings.savedProfiles;
     if (this.plugin.isPro && profiles.length > 0) {
       const select = header.createEl("select", { cls: "dropdown note-doctor-profile-select" });
@@ -239,6 +248,13 @@ export class NoteDoctorView extends ItemView {
 
     this.renderTiles(host, issues);
 
+    if (issues.length > 0) {
+      host.createDiv({
+        cls: "note-doctor-legend",
+        text: "Severity: H high · M medium · L low",
+      });
+    }
+
     if (issues.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
       const nudge = host.createDiv({ cls: "note-doctor-nudge" });
       nudge.appendText("Also catch notes missing metadata? ");
@@ -290,6 +306,7 @@ export class NoteDoctorView extends ItemView {
 
   private updateSelCount(): void {
     if (this.selCountEl) this.selCountEl.setText(`${this.selected.size} selected`);
+    this.updateBulkEnabled();
   }
 
   private renderToolbar(root: HTMLElement): void {
@@ -342,6 +359,16 @@ export class NoteDoctorView extends ItemView {
   private renderBulkBar(root: HTMLElement): void {
     const bar = root.createDiv({ cls: "note-doctor-bulk-bar" });
     this.selCountEl = bar.createSpan({ text: `${this.selected.size} selected` });
+    this.bulkActionButtons = [];
+
+    const shown = this.applyView(this.plugin.visibleIssues());
+    const allSelected = shown.length > 0 && shown.every((i) => this.selected.has(i.id));
+    const selectAll = bar.createEl("button", { text: allSelected ? "Select none" : "Select all" });
+    selectAll.addEventListener("click", () => {
+      if (allSelected) shown.forEach((i) => this.selected.delete(i.id));
+      else shown.forEach((i) => this.selected.add(i.id));
+      this.render();
+    });
 
     const selectedIssues = (): NoteIssue[] =>
       this.plugin.visibleIssues().filter((i) => this.selected.has(i.id));
@@ -384,11 +411,19 @@ export class NoteDoctorView extends ItemView {
       ).open();
     });
     this.bulkButton(bar, "Export selected", () => void this.plugin.exportReport(selectedIssues()));
+    this.updateBulkEnabled();
   }
 
   private bulkButton(bar: HTMLElement, label: string, onClick: () => void): void {
     const btn = bar.createEl("button", { text: label });
     btn.addEventListener("click", onClick);
+    this.bulkActionButtons.push(btn);
+  }
+
+  /** Bulk action buttons only act on a selection — disable them when it's empty. */
+  private updateBulkEnabled(): void {
+    const enabled = this.selected.size > 0;
+    for (const btn of this.bulkActionButtons) btn.disabled = !enabled;
   }
 
   private afterBulk(): void {
@@ -409,7 +444,16 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderProCta(root: HTMLElement): void {
+    // Once dismissed, the paywall shrinks to a quiet header link (see renderHeader).
+    if (this.plugin.settings.proCtaDismissed) return;
     const card = root.createDiv({ cls: "note-doctor-pro-cta" });
+    const dismiss = card.createEl("button", { cls: "note-doctor-cta-dismiss", text: "×" });
+    dismiss.setAttribute("aria-label", "Dismiss");
+    dismiss.addEventListener("click", () => {
+      this.plugin.settings.proCtaDismissed = true;
+      this.plugin.queueSave();
+      this.render();
+    });
     card.createEl("strong", { text: `Note Doctor Pro — ${PRO_PRICE_LABEL}` });
     card.createDiv({ text: PRO_TAGLINE });
     card.createEl("a", {

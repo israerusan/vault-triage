@@ -477,7 +477,31 @@ button.note-doctor-tile:hover {
   gap: var(--size-4-2);
 }
 
-.note-doctor-modal-label {
-  font-weight: var(--font-semibold);
-  margin: var(--size-4-3) 0 var(--size-2-1);
+.note-doctor-legend {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin-top: var(--size-2-2);
+}
+
+.note-doctor-pro-cta {
+  position: relative;
+}
+
+.note-doctor-cta-dismiss {
+  appearance: none;
+  border: none;
+  background: none;
+  box-shadow: none;
+  position: absolute;
+  top: var(--size-2-1);
+  right: var(--size-2-2);
+  padding: 0 var(--size-2-2);
+  font-size: var(--font-ui-medium);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.note-doctor-header-upsell {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-accent);
 }

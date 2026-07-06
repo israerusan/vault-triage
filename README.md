@@ -30,7 +30,7 @@ The free version detects:
 - **Thin notes** — barely any content
 - **Orphan notes** — no links in or out (truly disconnected)
 - **Missing required properties** — frontmatter fields you rely on are absent
-- **Draft markers** — `TODO`, `FIXME`, `WIP` by default (add your own, e.g. `draft`, in settings)
+- **Draft markers** — `TODO`, `FIXME`, `WIP` by default (add your own uppercase tokens like `DRAFT` in settings; markers match whole words in the body, so avoid common lowercase words)
 
 ## Free vs Pro
 

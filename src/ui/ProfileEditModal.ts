@@ -47,7 +47,7 @@ export class ProfileEditModal extends Modal {
       t.setPlaceholder("Weekly Review").setValue(this.name).onChange((v) => (this.name = v))
     );
 
-    contentEl.createEl("p", { text: "Issue types to include", cls: "note-doctor-modal-label" });
+    new Setting(contentEl).setName("Issue types to include").setHeading();
     for (const type of ISSUE_TYPES) {
       new Setting(contentEl).setName(ISSUE_TYPE_LABELS[type]).addToggle((t) =>
         t.setValue(this.enabledTypes.has(type)).onChange((v) => {
@@ -66,10 +66,7 @@ export class ProfileEditModal extends Modal {
       .setDesc("Comma-separated. Overrides the global exclusions when set.")
       .addText((t) => t.setValue(this.excludedFolders).onChange((v) => (this.excludedFolders = v)));
 
-    contentEl.createEl("p", {
-      text: "Threshold overrides (blank = use global)",
-      cls: "note-doctor-modal-label",
-    });
+    new Setting(contentEl).setName("Threshold overrides (blank = use global)").setHeading();
     new Setting(contentEl).setName("Stale after (days)").addText((t) =>
       t.setPlaceholder("global").setValue(this.staleDays).onChange((v) => (this.staleDays = v))
     );
@@ -87,10 +84,7 @@ export class ProfileEditModal extends Modal {
 
     const rules = this.plugin.settings.customRules;
     if (rules.length > 0) {
-      contentEl.createEl("p", {
-        text: "Custom rules to run (none selected = all)",
-        cls: "note-doctor-modal-label",
-      });
+      new Setting(contentEl).setName("Custom rules to run (all if none selected)").setHeading();
       for (const rule of rules) {
         new Setting(contentEl).setName(rule.name || "Untitled rule").addToggle((t) =>
           t.setValue(this.ruleIds ? this.ruleIds.has(rule.id) : true).onChange((v) => {
@@ -141,7 +135,8 @@ export class ProfileEditModal extends Modal {
       minNoteLength,
       requiredProperties: requiredProperties.length > 0 ? requiredProperties : undefined,
       draftMarkers: draftMarkers.length > 0 ? draftMarkers : undefined,
-      customRuleIds: this.ruleIds ? [...this.ruleIds] : undefined,
+      // Empty selection means "all rules", not "no rules".
+      customRuleIds: this.ruleIds && this.ruleIds.size > 0 ? [...this.ruleIds] : undefined,
     };
     await this.onSave(profile);
     this.close();

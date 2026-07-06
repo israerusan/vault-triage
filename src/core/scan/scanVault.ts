@@ -83,13 +83,19 @@ export async function scanVault(
   // Pass 2: read + detect in bounded-parallel batches, yielding between them.
   for (let i = 0; i < candidates.length; i += READ_BATCH) {
     const batch = candidates.slice(i, i + READ_BATCH);
-    const contents = await Promise.all(batch.map((c) => app.vault.cachedRead(c.file)));
+    // A file removed/renamed between pass 1 and here rejects; let it drop out
+    // rather than aborting the whole scan.
+    const contents = await Promise.all(
+      batch.map((c) => app.vault.cachedRead(c.file).catch(() => null))
+    );
     batch.forEach((c, j) => {
+      const content = contents[j];
+      if (content === null) return;
       const stat = buildNoteStat({
         path: c.file.path,
         name: c.file.basename,
         mtime: c.file.stat.mtime,
-        content: contents[j],
+        content,
         frontmatter: c.frontmatter,
         tags: c.tags,
         inboundLinks: inbound.get(c.file.path) ?? 0,
@@ -202,9 +208,10 @@ export function resolveScanConfig(
     excludedFolders: profile.excludedFolders?.length
       ? profile.excludedFolders
       : base.excludedFolders,
-    customRules: profile.customRuleIds
-      ? base.customRules.filter((r) => ruleIds.has(r.id))
-      : base.customRules,
+    customRules:
+      profile.customRuleIds && profile.customRuleIds.length > 0
+        ? base.customRules.filter((r) => ruleIds.has(r.id))
+        : base.customRules,
     sortMode: profile.sortMode ?? base.sortMode,
   };
 }

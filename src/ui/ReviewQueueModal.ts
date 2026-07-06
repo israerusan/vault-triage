@@ -142,9 +142,13 @@ export class ReviewQueueModal extends Modal {
           { key: "value", label: "Value", placeholder: "reviewed" },
         ],
         (v) => {
-          if (v.key.trim()) {
-            void this.plugin.bulkAddProperty([issue.notePath], v.key.trim(), v.value);
-          }
+          if (!v.key.trim()) return;
+          void this.plugin
+            .bulkAddProperty([issue.notePath], v.key.trim(), v.value)
+            .then((changed) => {
+              // If the note was actually fixed, drop it from the queue and advance.
+              if (changed.length > 0) this.dropCurrent();
+            });
         }
       ).open();
     });

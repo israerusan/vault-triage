@@ -58,6 +58,9 @@ export default class NoteDoctorPlugin extends Plugin {
   /** Debounce handle for coalescing rapid ignore/reviewed writes. */
   private saveTimer: number | null = null;
 
+  /** Aborts a pending cache-settle wait if the plugin unloads mid-flight. */
+  private abortCacheWait: (() => void) | null = null;
+
   async onload(): Promise<void> {
     await this.loadSettings();
     this.refreshLicense();
@@ -174,6 +177,7 @@ export default class NoteDoctorPlugin extends Plugin {
 
   onunload(): void {
     this.flushPendingSave();
+    if (this.abortCacheWait) this.abortCacheWait();
   }
 
   private rebuildKeySets(): void {
@@ -181,11 +185,16 @@ export default class NoteDoctorPlugin extends Plugin {
     this.reviewedSet = new Set(this.settings.reviewedIssueKeys);
   }
 
-  /** Keep only ignore/reviewed keys for issues present in the given (full) scan. */
-  private pruneKeys(issues: NoteIssue[]): void {
-    const live = new Set(issues.map((i) => i.id));
-    for (const k of [...this.ignoredSet]) if (!live.has(k)) this.ignoredSet.delete(k);
-    for (const k of [...this.reviewedSet]) if (!live.has(k)) this.reviewedSet.delete(k);
+  /**
+   * Drop ignore/reviewed keys only for notes that no longer exist. Keeping keys
+   * for still-present notes preserves the user's curation across threshold changes
+   * (e.g. a note that stops being "thin" and later qualifies again stays ignored).
+   */
+  private pruneKeys(): void {
+    const gone = (key: string): boolean =>
+      this.app.vault.getAbstractFileByPath(issueKeyPath(key)) === null;
+    for (const k of [...this.ignoredSet]) if (gone(k)) this.ignoredSet.delete(k);
+    for (const k of [...this.reviewedSet]) if (gone(k)) this.reviewedSet.delete(k);
   }
 
   /** Re-verify the stored license key and update the Pro entitlement flags. */
@@ -271,13 +280,15 @@ export default class NoteDoctorPlugin extends Plugin {
         profileId,
       };
       this.settings.onboardingDismissed = true;
-      // On a full scan, forget ignore/reviewed marks for issues that no longer
-      // exist (a note got fixed), so those arrays stay proportional to live issues.
-      if (!profileId) this.pruneKeys(issues);
+      // Forget marks for notes that no longer exist (bounds data.json growth).
+      if (!profileId) this.pruneKeys();
       await this.saveSettings();
 
       const visible = this.visibleIssues().length;
       new Notice(`${PRODUCT_NAME}: ${visible} issue(s) across ${totalFiles} note(s).`);
+    } catch (err) {
+      console.error("Note Doctor: scan failed", err);
+      new Notice("Note Doctor: scan failed. See the console for details.");
     } finally {
       this.scanning = false;
       this.refreshViews();
@@ -582,7 +593,8 @@ export default class NoteDoctorPlugin extends Plugin {
     await this.runScan(this.lastResult?.profileId);
   }
 
-  /** Resolve once the metadata cache has emitted `changed` for every path (or 2s). */
+  /** Resolve once the metadata cache has emitted `changed` for every path (or 2s,
+   *  or immediately if the plugin unloads). */
   private awaitCacheChanges(paths: string[]): Promise<void> {
     const pending = new Set(paths);
     return new Promise<void>((resolve) => {
@@ -592,6 +604,7 @@ export default class NoteDoctorPlugin extends Plugin {
         done = true;
         this.app.metadataCache.offref(ref);
         window.clearTimeout(timer);
+        this.abortCacheWait = null;
         resolve();
       };
       const ref = this.app.metadataCache.on("changed", (file) => {
@@ -599,6 +612,7 @@ export default class NoteDoctorPlugin extends Plugin {
         if (pending.size === 0) finish();
       });
       const timer = window.setTimeout(finish, 2000);
+      this.abortCacheWait = finish;
     });
   }
 
