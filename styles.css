@@ -1,0 +1,240 @@
+/* Note Doctor — all styling lives here (no inline JS styles, per Obsidian review).
+   Everything is built on Obsidian CSS variables so it adapts to the active theme,
+   light or dark, and to the user's interface-font size. */
+
+.note-doctor-view {
+  padding: var(--size-4-3);
+  font-size: var(--font-ui-small);
+}
+
+.note-doctor-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--size-4-2);
+}
+
+.note-doctor-header h2 {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--font-ui-large);
+}
+
+.note-doctor-summary {
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-filters,
+.note-doctor-toolbar,
+.note-doctor-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--size-4-2);
+}
+
+.note-doctor-chip {
+  padding: var(--size-2-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.note-doctor-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.note-doctor-chip.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.note-doctor-bulk-bar {
+  padding: var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+}
+
+/* Results list */
+
+.note-doctor-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+}
+
+.note-doctor-row {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-3) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+}
+
+.note-doctor-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.note-doctor-row.is-reviewed {
+  opacity: 0.55;
+}
+
+.note-doctor-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-1);
+  min-width: 0;
+  flex: 1;
+}
+
+.note-doctor-row-title {
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-doctor-row-title:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.note-doctor-row-reason {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-doctor-row-actions {
+  display: flex;
+  gap: var(--size-2-1);
+  flex-shrink: 0;
+}
+
+.note-doctor-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--size-2-1);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.note-doctor-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Issue-type badge */
+
+.note-doctor-badge {
+  flex-shrink: 0;
+  padding: var(--size-2-1) var(--size-4-1);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-on-accent);
+  white-space: nowrap;
+}
+
+.note-doctor-badge.is-stale { background: var(--color-orange); }
+.note-doctor-badge.is-thin { background: var(--color-yellow); color: var(--text-normal); }
+.note-doctor-badge.is-orphan { background: var(--color-purple); }
+.note-doctor-badge.is-missing-properties { background: var(--color-red); }
+.note-doctor-badge.is-draft-marker { background: var(--color-blue); }
+.note-doctor-badge.is-custom { background: var(--color-green); }
+
+.note-doctor-empty {
+  color: var(--text-muted);
+  padding: var(--size-4-4) 0;
+  text-align: center;
+}
+
+/* Pro surfaces */
+
+.note-doctor-pro-pill {
+  margin-left: var(--size-4-2);
+  padding: 0 var(--size-4-1);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  vertical-align: middle;
+}
+
+.note-doctor-locked {
+  opacity: 0.9;
+}
+
+.note-doctor-pro-cta {
+  margin-top: var(--size-4-4);
+  padding: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+  align-items: flex-start;
+}
+
+/* Review queue modal */
+
+.note-doctor-review-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.note-doctor-review-header {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  margin-top: var(--size-2-2);
+}
+
+.note-doctor-reviewed-tag {
+  color: var(--text-success);
+  font-size: var(--font-ui-smaller);
+}
+
+.note-doctor-review-title {
+  margin: var(--size-4-2) 0 var(--size-2-2);
+}
+
+.note-doctor-review-reason {
+  color: var(--text-normal);
+  margin-bottom: var(--size-2-2);
+}
+
+.note-doctor-review-path {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-review-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-review-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+}
+
+.note-doctor-modal-label {
+  font-weight: var(--font-semibold);
+  margin: var(--size-4-3) 0 var(--size-2-1);
+}

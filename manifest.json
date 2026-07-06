@@ -1,0 +1,11 @@
+{
+  "id": "note-doctor",
+  "name": "Note Doctor",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Scan your vault for stale notes, orphans, missing metadata, and unfinished drafts, then clean them up fast.",
+  "author": "Israel Avila",
+  "authorUrl": "https://github.com/israerusan",
+  "fundingUrl": "https://buymeacoffee.com/notedoctor",
+  "isDesktopOnly": false
+}

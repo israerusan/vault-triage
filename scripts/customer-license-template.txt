@@ -1,0 +1,30 @@
+Subject: Your Note Doctor Pro license key
+
+Hi there,
+
+Thanks for buying Note Doctor Pro! Here is your license key:
+
+{{LICENSE_KEY}}
+
+To activate:
+
+1. In Obsidian, open Settings → Community plugins → Note Doctor.
+2. Scroll to the "Pro license" section.
+3. Paste the key into the "License key" field and click Validate.
+4. You'll see "Note Doctor Pro unlocked" and all Pro features turn on immediately.
+
+Your key works completely offline — no account, no sign-in, no server checks.
+Keep this email; you can re-enter the key on any device where you use this vault.
+
+Pro unlocks:
+- Saved scan profiles (reusable audits like Weekly Review or Project Notes Audit)
+- Custom rules for your own vault structure
+- Safe bulk actions across many flagged notes
+- Advanced review workflows (by category, profile, severity, or folder)
+- Severity tuning
+- Markdown report export
+
+If anything doesn't work, just reply to this email and I'll sort it out.
+
+Thanks again,
+Israel
