@@ -156,15 +156,15 @@ export function resolveScanConfig(
   return {
     ...base,
     // A profile's enabled types are honored exactly — including an empty set,
-    // which scans nothing (ProfileEditModal blocks saving zero types, so an empty
-    // set only arrives from hand-edited data). This is NOT a "fall back to all".
-    enabledIssueTypes: profile.enabledIssueTypes,
+    // which scans nothing (ProfileEditModal blocks saving zero types). A missing
+    // field (hand-edited data) falls back to base; an empty array does NOT.
+    enabledIssueTypes: profile.enabledIssueTypes ?? base.enabledIssueTypes,
     staleDaysThreshold: profile.staleDaysThreshold ?? base.staleDaysThreshold,
     minNoteLength: profile.minNoteLength ?? base.minNoteLength,
     requiredProperties: profile.requiredProperties ?? base.requiredProperties,
     draftMarkers: profile.draftMarkers ?? base.draftMarkers,
     includedFolders: profile.includedFolders ?? [],
-    excludedFolders: profile.excludedFolders.length
+    excludedFolders: profile.excludedFolders?.length
       ? profile.excludedFolders
       : base.excludedFolders,
     customRules: profile.customRuleIds

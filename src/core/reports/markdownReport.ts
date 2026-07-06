@@ -51,7 +51,11 @@ export function buildMarkdownReport(input: ReportInput): string {
     if (group.length === 0) continue;
     lines.push(`## ${ISSUE_TYPE_LABELS[issueType]}`);
     for (const issue of group) {
-      const link = `- [[${stripMdExtension(issue.noteName)}]]`;
+      // Link by full path with a short display alias, so notes that share a
+      // basename (index, README, daily notes…) resolve to the RIGHT file.
+      const target = stripMdExtension(issue.notePath);
+      const alias = stripMdExtension(issue.noteName);
+      const link = `- [[${target}|${alias}]]`;
       // Fall back to the reason so every line carries the "why" the dashboard
       // shows — not just the missing-properties detector, which is the only one
       // that sets `details`.

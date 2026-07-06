@@ -96,11 +96,22 @@
 }
 
 .note-doctor-row-title {
+  /* A focusable button styled as a link (keyboard-operable, no button chrome). */
+  appearance: none;
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  color: var(--text-normal);
   font-weight: var(--font-semibold);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
 }
 
 .note-doctor-row-title:hover {
@@ -122,6 +133,10 @@
 }
 
 .note-doctor-icon-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,8 +241,43 @@ a.note-doctor-cta-link:hover {
 
 .note-doctor-onboarding-blurb {
   color: var(--text-muted);
-  margin-bottom: var(--size-4-3);
+  margin-bottom: var(--size-2-3);
   line-height: var(--line-height-normal);
+}
+
+.note-doctor-onboarding-hint {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: var(--size-4-3);
+}
+
+/* Determinate scan progress */
+
+.note-doctor-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+  margin-top: var(--size-2-2);
+}
+
+.note-doctor-progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--interactive-accent);
+  transition: width 0.15s ease;
+}
+
+/* Windowed results: "show more" footer */
+
+.note-doctor-results-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--size-4-2);
+}
+
+.note-doctor-results-footer:empty {
+  margin-top: 0;
 }
 
 /* Header stat + category tiles */
@@ -261,6 +311,9 @@ a.note-doctor-cta-link:hover {
 }
 
 .note-doctor-tile {
+  appearance: none;
+  box-shadow: none;
+  font: inherit;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -272,8 +325,12 @@ a.note-doctor-cta-link:hover {
   cursor: pointer;
 }
 
-.note-doctor-tile:hover {
+button.note-doctor-tile:hover {
   background: var(--background-modifier-hover);
+}
+
+.note-doctor-tile.is-static {
+  cursor: default;
 }
 
 .note-doctor-tile.is-active {

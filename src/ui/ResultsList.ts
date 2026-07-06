@@ -16,17 +16,21 @@ interface SeverityTier {
   label: string;
 }
 
+/** Tiers are reachable on a default free scan (weights top out at 3). */
 function severityTier(severity: number): SeverityTier {
-  if (severity >= 4) return { cls: "is-high", label: "High" };
+  if (severity >= 3) return { cls: "is-high", label: "High" };
   if (severity >= 2) return { cls: "is-med", label: "Medium" };
   return { cls: "is-low", label: "Low" };
 }
 
+/** How many rows to build up front; the rest load on demand to bound first paint. */
+const INITIAL_ROWS = 200;
+
 /**
  * Render an already-sorted list of issues. Each row opens its note and exposes
  * mark-reviewed / ignore inline, with reveal + exclude in an overflow menu.
- * Toggling reviewed/ignore/exclude updates only the affected rows — the whole
- * view is never rebuilt for a single interaction.
+ * Rows are windowed (large lists load in chunks) and toggling reviewed/ignore/
+ * exclude updates only the affected rows — the whole view is never rebuilt.
  */
 export function renderResultsList(
   container: HTMLElement,
@@ -40,99 +44,125 @@ export function renderResultsList(
   }
 
   const list = container.createDiv({ cls: "note-doctor-results" });
+  const footer = container.createDiv({ cls: "note-doctor-results-footer" });
   // Track every row per note path so "exclude note" can remove them all at once.
   const rowsByPath = new Map<string, HTMLElement[]>();
+  let shown = 0;
 
-  for (const issue of issues) {
-    const row = list.createDiv({ cls: "note-doctor-row" });
-    if (plugin.isReviewed(issue)) row.addClass("is-reviewed");
-    const bucket = rowsByPath.get(issue.notePath) ?? [];
-    bucket.push(row);
-    rowsByPath.set(issue.notePath, bucket);
+  const renderMore = (): void => {
+    const slice = issues.slice(shown, shown + INITIAL_ROWS);
+    for (const issue of slice) renderRow(list, plugin, issue, opts, rowsByPath);
+    shown += slice.length;
 
-    if (opts.bulkMode) {
-      const check = row.createEl("input", { type: "checkbox", cls: "note-doctor-check" });
-      check.checked = opts.selected.has(issue.id);
-      check.addEventListener("change", () => {
-        if (check.checked) opts.selected.add(issue.id);
-        else opts.selected.delete(issue.id);
-        opts.onSelectionChange();
+    footer.empty();
+    const remaining = issues.length - shown;
+    if (remaining > 0) {
+      const more = footer.createEl("button", {
+        text: `Show ${Math.min(remaining, INITIAL_ROWS)} more (${remaining} left)`,
       });
+      more.addEventListener("click", renderMore);
     }
+  };
 
-    const tier = severityTier(issue.severity);
-    const dot = row.createSpan({ cls: `note-doctor-sev-dot ${tier.cls}` });
-    dot.setAttribute("aria-label", `${tier.label} severity`);
+  renderMore();
+}
 
-    row.createSpan({
-      cls: `note-doctor-badge is-${issue.issueType}`,
-      text: ISSUE_TYPE_LABELS[issue.issueType],
-    });
+function renderRow(
+  list: HTMLElement,
+  plugin: NoteDoctorPlugin,
+  issue: NoteIssue,
+  opts: ResultsListOptions,
+  rowsByPath: Map<string, HTMLElement[]>
+): void {
+  const row = list.createDiv({ cls: "note-doctor-row" });
+  if (plugin.isReviewed(issue)) row.addClass("is-reviewed");
+  const bucket = rowsByPath.get(issue.notePath) ?? [];
+  bucket.push(row);
+  rowsByPath.set(issue.notePath, bucket);
 
-    const main = row.createDiv({ cls: "note-doctor-row-main" });
-    const title = main.createDiv({ cls: "note-doctor-row-title", text: issue.noteName });
-    title.addEventListener("click", () => void plugin.openNote(issue.notePath));
-    main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
-
-    const actions = row.createDiv({ cls: "note-doctor-row-actions" });
-    iconButton(actions, "file-search", "Open note", () => void plugin.openNote(issue.notePath));
-
-    const reviewBtn = iconButton(actions, "check", "", () => {});
-    const paintReviewed = (): void => {
-      const on = plugin.isReviewed(issue);
-      setIcon(reviewBtn, on ? "rotate-ccw" : "check");
-      reviewBtn.setAttribute("aria-label", on ? "Mark not reviewed" : "Mark reviewed");
-      reviewBtn.toggleClass("is-active", on);
-    };
-    paintReviewed();
-    reviewBtn.addEventListener("click", () => {
-      void plugin.setReviewed(issue, !plugin.isReviewed(issue)).then(() => {
-        row.toggleClass("is-reviewed", plugin.isReviewed(issue));
-        paintReviewed();
-        opts.onCountsChanged();
-      });
-    });
-
-    iconButton(actions, "eye-off", "Ignore this result", () => {
-      void plugin.setIgnored(issue, true).then(() => {
-        row.remove();
-        opts.onCountsChanged();
-      });
-    });
-
-    iconButton(actions, "more-horizontal", "More actions", (evt) => {
-      const menu = new Menu();
-      menu.addItem((item) =>
-        item
-          .setTitle("Reveal in file explorer")
-          .setIcon("folder-open")
-          .onClick(() => void plugin.revealNote(issue.notePath))
-      );
-      menu.addItem((item) =>
-        item
-          .setTitle("Exclude note from future scans")
-          .setIcon("ban")
-          .onClick(() => {
-            void plugin.excludeNote(issue.notePath).then(() => {
-              for (const r of rowsByPath.get(issue.notePath) ?? []) r.remove();
-              opts.onCountsChanged();
-            });
-          })
-      );
-      menu.showAtMouseEvent(evt);
+  if (opts.bulkMode) {
+    const check = row.createEl("input", { type: "checkbox", cls: "note-doctor-check" });
+    check.checked = opts.selected.has(issue.id);
+    check.setAttribute("aria-label", `Select ${issue.noteName}`);
+    check.addEventListener("change", () => {
+      if (check.checked) opts.selected.add(issue.id);
+      else opts.selected.delete(issue.id);
+      opts.onSelectionChange();
     });
   }
+
+  const tier = severityTier(issue.severity);
+  const dot = row.createSpan({ cls: `note-doctor-sev-dot ${tier.cls}` });
+  dot.setAttribute("aria-label", `${tier.label} severity`);
+
+  row.createSpan({
+    cls: `note-doctor-badge is-${issue.issueType}`,
+    text: ISSUE_TYPE_LABELS[issue.issueType],
+  });
+
+  const main = row.createDiv({ cls: "note-doctor-row-main" });
+  const title = main.createEl("button", { cls: "note-doctor-row-title", text: issue.noteName });
+  title.addEventListener("click", () => void plugin.openNote(issue.notePath));
+  main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
+
+  const actions = row.createDiv({ cls: "note-doctor-row-actions" });
+  iconButton(actions, "file-search", "Open note", () => void plugin.openNote(issue.notePath));
+
+  const reviewBtn = iconButton(actions, "check", "");
+  const paintReviewed = (): void => {
+    const on = plugin.isReviewed(issue);
+    setIcon(reviewBtn, on ? "rotate-ccw" : "check");
+    reviewBtn.setAttribute("aria-label", on ? "Mark not reviewed" : "Mark reviewed");
+    reviewBtn.toggleClass("is-active", on);
+  };
+  paintReviewed();
+  reviewBtn.addEventListener("click", () => {
+    void plugin.setReviewed(issue, !plugin.isReviewed(issue)).then(() => {
+      row.toggleClass("is-reviewed", plugin.isReviewed(issue));
+      paintReviewed();
+      opts.onCountsChanged();
+    });
+  });
+
+  iconButton(actions, "eye-off", "Ignore this result", () => {
+    void plugin.setIgnored(issue, true).then(() => {
+      row.remove();
+      opts.onCountsChanged();
+    });
+  });
+
+  iconButton(actions, "more-horizontal", "More actions", (evt) => {
+    const menu = new Menu();
+    menu.addItem((item) =>
+      item
+        .setTitle("Reveal in file explorer")
+        .setIcon("folder-open")
+        .onClick(() => void plugin.revealNote(issue.notePath))
+    );
+    menu.addItem((item) =>
+      item
+        .setTitle("Exclude note from future scans")
+        .setIcon("ban")
+        .onClick(() => {
+          void plugin.excludeNote(issue.notePath).then(() => {
+            for (const r of rowsByPath.get(issue.notePath) ?? []) r.remove();
+            opts.onCountsChanged();
+          });
+        })
+    );
+    menu.showAtMouseEvent(evt);
+  });
 }
 
 function iconButton(
   parent: HTMLElement,
   icon: string,
   tooltip: string,
-  onClick: (evt: MouseEvent) => void
-): HTMLElement {
-  const btn = parent.createDiv({ cls: "note-doctor-icon-btn" });
+  onClick?: (evt: MouseEvent) => void
+): HTMLButtonElement {
+  const btn = parent.createEl("button", { cls: "note-doctor-icon-btn clickable-icon" });
   setIcon(btn, icon);
   if (tooltip) btn.setAttribute("aria-label", tooltip);
-  btn.addEventListener("click", onClick);
+  if (onClick) btn.addEventListener("click", onClick);
   return btn;
 }

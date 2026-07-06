@@ -69,14 +69,15 @@ assert.ok(
   "stale section precedes thin section",
 );
 
-// Bullets: .md stripped from link text; details win, else the reason is the fallback
-// so every line carries the "why".
-assert.ok(reportLines.includes("- [[old]] — 120 days old"), "stale bullet with details");
+// Bullets: link by full path with a short alias so duplicate basenames resolve
+// correctly; details win, else the reason is the fallback so every line has a "why".
+assert.ok(reportLines.includes("- [[notes/old|old]] — 120 days old"), "path-qualified link with details");
 assert.ok(
-  reportLines.includes("- [[old2]] — not touched in a while"),
+  reportLines.includes("- [[notes/old2|old2]] — not touched in a while"),
   "detail-less bullet falls back to the reason",
 );
-assert.ok(reportLines.includes("- [[thin]] — too short"), "thin bullet carries its reason");
+assert.ok(reportLines.includes("- [[notes/thin|thin]] — too short"), "thin bullet carries its reason");
+assert.ok(!report.includes(".md|"), "no .md extension in link target");
 assert.ok(!report.includes(".md]]"), "no .md extension in link text");
 
 // --- Without a profile name -------------------------------------------------

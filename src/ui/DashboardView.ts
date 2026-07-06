@@ -21,9 +21,10 @@ export class NoteDoctorView extends ItemView {
   private bulkMode = false;
   private selected = new Set<string>();
 
-  /** Region holding the summary stat + category tiles, refreshed in place. */
   private metaEl: HTMLElement | null = null;
   private summaryEl: HTMLElement | null = null;
+  private progressEl: HTMLElement | null = null;
+  private selCountEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: NoteDoctorPlugin) {
     super(leaf);
@@ -45,10 +46,14 @@ export class NoteDoctorView extends ItemView {
     this.render();
   }
 
-  /** Cheap progress update during a scan — touches only the summary line. */
+  /** Cheap progress update during a scan — touches only the counter and bar. */
   showScanProgress(done: number, total: number): void {
     if (this.summaryEl) {
-      this.summaryEl.setText(total > 0 ? `Scanning ${done} / ${total}…` : "Scanning…");
+      this.summaryEl.setText(total > 0 ? `${done} / ${total} notes` : "");
+    }
+    if (this.progressEl) {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      this.progressEl.setCssStyles({ width: `${pct}%` });
     }
   }
 
@@ -58,27 +63,43 @@ export class NoteDoctorView extends ItemView {
     root.addClass("note-doctor-view");
     this.metaEl = null;
     this.summaryEl = null;
+    this.progressEl = null;
+    this.selCountEl = null;
 
     this.renderHeader(root);
 
-    if (!this.plugin.lastResult && !this.plugin.scanning) {
-      this.summaryEl = root.createDiv({ cls: "note-doctor-summary" });
-      this.renderOnboarding(root);
+    if (this.plugin.scanning) {
+      this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
+      this.renderScanningMeta();
+      return;
+    }
+
+    if (!this.plugin.lastResult) {
+      if (!this.plugin.settings.onboardingDismissed) {
+        this.renderOnboarding(root);
+      } else {
+        this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
+        this.renderHydratedMeta(root);
+      }
       if (!this.plugin.isPro) this.renderProCta(root);
       return;
     }
 
     const issues = this.plugin.visibleIssues();
+    // If the active filter's category has been fully cleared, fall back to All.
+    if (this.filter !== "all" && (countByType(issues)[this.filter] ?? 0) === 0) {
+      this.filter = "all";
+    }
+
     this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
     this.renderMeta(issues);
-
     this.renderToolbar(root);
     if (this.bulkMode) this.renderBulkBar(root);
 
     renderResultsList(root.createDiv(), this.plugin, this.applyView(issues), {
       bulkMode: this.bulkMode,
       selected: this.selected,
-      onSelectionChange: () => this.render(),
+      onSelectionChange: () => this.updateSelCount(),
       onCountsChanged: () => this.refreshMeta(),
     });
 
@@ -109,12 +130,57 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderOnboarding(root: HTMLElement): void {
-    if (this.summaryEl) this.summaryEl.setText("");
     const card = root.createDiv({ cls: "note-doctor-onboarding" });
     card.createEl("h3", { text: "Find what needs attention" });
     card.createDiv({ cls: "note-doctor-onboarding-blurb", text: CHECK_BLURB });
+    card.createDiv({
+      cls: "note-doctor-onboarding-hint",
+      text: "Tip: to check for missing metadata, add fields under Required properties in settings.",
+    });
     const btn = card.createEl("button", { text: "Run your first scan", cls: "mod-cta" });
     btn.addEventListener("click", () => void this.plugin.runScan());
+  }
+
+  private renderScanningMeta(): void {
+    const host = this.metaEl;
+    if (!host) return;
+    host.empty();
+    const stat = host.createDiv({ cls: "note-doctor-stat" });
+    stat.createSpan({ cls: "note-doctor-stat-label", text: "Scanning your vault…" });
+    this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
+    const track = host.createDiv({ cls: "note-doctor-progress" });
+    this.progressEl = track.createDiv({ cls: "note-doctor-progress-bar" });
+    this.showScanProgress(this.plugin.scanDone, this.plugin.scanTotal);
+  }
+
+  /** After a restart there's no in-memory result; show the last scan's summary. */
+  private renderHydratedMeta(root: HTMLElement): void {
+    const host = this.metaEl;
+    const summary = this.plugin.settings.lastScanSummary;
+    if (!host || !summary) {
+      this.renderOnboarding(root);
+      return;
+    }
+    host.empty();
+    const stat = host.createDiv({ cls: "note-doctor-stat" });
+    stat.createSpan({ cls: "note-doctor-stat-num", text: String(summary.totalIssues) });
+    stat.createSpan({
+      cls: "note-doctor-stat-label",
+      text: summary.totalIssues === 1 ? "note needed attention" : "notes needed attention",
+    });
+    host
+      .createDiv({ cls: "note-doctor-summary" })
+      .setText(
+        `Last scan ${relativeTime(summary.scannedAt)} · ${summary.totalFiles} notes · run a scan to review`
+      );
+    const tiles = host.createDiv({ cls: "note-doctor-tiles" });
+    for (const type of ISSUE_TYPES) {
+      const count = summary.byType[type] ?? 0;
+      if (count === 0) continue;
+      const tile = tiles.createDiv({ cls: "note-doctor-tile is-static" });
+      tile.createDiv({ cls: "note-doctor-tile-count", text: String(count) });
+      tile.createDiv({ cls: "note-doctor-tile-label", text: ISSUE_TYPE_LABELS[type] });
+    }
   }
 
   private renderMeta(issues: NoteIssue[]): void {
@@ -123,24 +189,20 @@ export class NoteDoctorView extends ItemView {
     host.empty();
 
     const stat = host.createDiv({ cls: "note-doctor-stat" });
-    if (issues.length === 0) {
-      stat.createSpan({ cls: "note-doctor-stat-num", text: "0" });
-      stat.createSpan({ cls: "note-doctor-stat-label", text: "Your vault is clean." });
-    } else {
-      stat.createSpan({ cls: "note-doctor-stat-num", text: String(issues.length) });
-      stat.createSpan({
-        cls: "note-doctor-stat-label",
-        text: issues.length === 1 ? "note needs attention" : "notes need attention",
-      });
-    }
+    stat.createSpan({ cls: "note-doctor-stat-num", text: String(issues.length) });
+    stat.createSpan({
+      cls: "note-doctor-stat-label",
+      text:
+        issues.length === 0
+          ? "your vault is clean"
+          : issues.length === 1
+            ? "note needs attention"
+            : "notes need attention",
+    });
 
     this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
     const last = this.plugin.lastResult;
-    if (this.plugin.scanning) {
-      this.summaryEl.setText(
-        this.plugin.scanTotal > 0 ? `Scanning ${this.plugin.scanDone} / ${this.plugin.scanTotal}…` : "Scanning…"
-      );
-    } else if (last) {
+    if (last) {
       this.summaryEl.setText(`Scanned ${relativeTime(last.scannedAt)} · ${last.totalFiles} notes`);
     }
 
@@ -170,7 +232,7 @@ export class NoteDoctorView extends ItemView {
     active: boolean,
     onClick: () => void
   ): void {
-    const tile = host.createDiv({ cls: "note-doctor-tile" });
+    const tile = host.createEl("button", { cls: "note-doctor-tile" });
     if (active) tile.addClass("is-active");
     tile.createDiv({ cls: "note-doctor-tile-count", text: String(count) });
     tile.createDiv({ cls: "note-doctor-tile-label", text: label });
@@ -180,6 +242,10 @@ export class NoteDoctorView extends ItemView {
   /** Refresh only the stat/tiles/summary after an in-place row mutation. */
   private refreshMeta(): void {
     if (this.metaEl) this.renderMeta(this.plugin.visibleIssues());
+  }
+
+  private updateSelCount(): void {
+    if (this.selCountEl) this.selCountEl.setText(`${this.selected.size} selected`);
   }
 
   private renderToolbar(root: HTMLElement): void {
@@ -199,22 +265,19 @@ export class NoteDoctorView extends ItemView {
       this.render();
     });
 
+    // Reviewing the current view (all or a filtered subset) is free.
     const scoped = this.filter !== "all";
     const review = bar.createEl("button", {
       text: scoped ? `Review ${ISSUE_TYPE_LABELS[this.filter as IssueType]}` : "Review flagged",
     });
-    review.addEventListener("click", () => {
-      const subset = this.applyView(this.plugin.visibleIssues());
-      // Reviewing everything is free; reviewing a scoped/filtered subset is a Pro
-      // "advanced review workflow".
-      if (scoped) {
-        requirePro(this.plugin, "review", () => this.plugin.openReviewQueue(subset));
-      } else {
-        this.plugin.openReviewQueue(subset);
-      }
-    });
+    review.addEventListener("click", () =>
+      this.plugin.openReviewQueue(this.applyView(this.plugin.visibleIssues()))
+    );
 
     const bulk = bar.createEl("button", { text: this.bulkMode ? "Exit bulk" : "Bulk actions" });
+    if (!this.bulkMode && !this.plugin.isPro) {
+      bulk.createSpan({ cls: "note-doctor-pro-pill", text: "Pro" });
+    }
     bulk.addEventListener("click", () => {
       if (this.bulkMode) {
         this.bulkMode = false;
@@ -231,7 +294,7 @@ export class NoteDoctorView extends ItemView {
 
   private renderBulkBar(root: HTMLElement): void {
     const bar = root.createDiv({ cls: "note-doctor-bulk-bar" });
-    bar.createSpan({ text: `${this.selected.size} selected` });
+    this.selCountEl = bar.createSpan({ text: `${this.selected.size} selected` });
 
     const selectedIssues = (): NoteIssue[] =>
       this.plugin.visibleIssues().filter((i) => this.selected.has(i.id));
@@ -292,7 +355,7 @@ export class NoteDoctorView extends ItemView {
     card.createDiv({ text: PRO_TAGLINE });
     card.createEl("a", {
       text: "Unlock Pro",
-      cls: "mod-cta note-doctor-cta-link",
+      cls: "note-doctor-cta-link",
       href: PURCHASE_URL,
     });
   }

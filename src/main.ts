@@ -14,7 +14,7 @@ import { ReviewQueueModal } from "./ui/ReviewQueueModal";
 import { scanVault, resolveScanConfig } from "./core/scan/scanVault";
 import { countByType } from "./core/rules/severity";
 import { buildMarkdownReport } from "./core/reports/markdownReport";
-import { hasProperty } from "./core/utils/frontmatter";
+import { issueKey } from "./core/utils/ids";
 import { LicenseManager } from "./core/license/LicenseManager";
 import { requirePro } from "./ui/pro/ProGate";
 import { PRODUCT_NAME } from "./product";
@@ -91,15 +91,18 @@ export default class NoteDoctorPlugin extends Plugin {
       callback: () => this.exportReportCommand(),
     });
 
-    // Keep dismissed/excluded state attached to notes as they move or disappear.
+    // Keep dismissed/excluded state and any on-screen results attached to notes
+    // as they move or disappear.
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         if (this.migratePath(oldPath, file.path)) void this.saveSettings();
+        if (this.remapLastResult(oldPath, file.path)) this.refreshViews();
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
         if (this.dropPath(file.path)) void this.saveSettings();
+        if (this.dropLastResult(file.path)) this.refreshViews();
       })
     );
 
@@ -139,6 +142,14 @@ export default class NoteDoctorPlugin extends Plugin {
   private rebuildKeySets(): void {
     this.ignoredSet = new Set(this.settings.ignoredIssueKeys);
     this.reviewedSet = new Set(this.settings.reviewedIssueKeys);
+  }
+
+  /** Keep only ignore/reviewed keys for issues present in the given (full) scan. */
+  private pruneKeys(issues: NoteIssue[]): void {
+    const live = new Set(issues.map((i) => i.id));
+    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.filter((k) => live.has(k));
+    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.filter((k) => live.has(k));
+    this.rebuildKeySets();
   }
 
   /** Re-verify the stored license key and update the Pro entitlement flags. */
@@ -223,6 +234,9 @@ export default class NoteDoctorPlugin extends Plugin {
         profileId,
       };
       this.settings.onboardingDismissed = true;
+      // On a full scan, forget ignore/reviewed marks for issues that no longer
+      // exist (a note got fixed), so those arrays stay proportional to live issues.
+      if (!profileId) this.pruneKeys(issues);
       await this.saveSettings();
 
       const visible = this.visibleIssues().length;
@@ -319,6 +333,35 @@ export default class NoteDoctorPlugin extends Plugin {
     );
   }
 
+  /** Rewrite in-memory scan results when a note (or folder) is renamed/moved. */
+  private remapLastResult(oldPath: string, newPath: string): boolean {
+    if (!this.lastResult) return false;
+    let changed = false;
+    this.lastResult.issues = this.lastResult.issues.map((issue) => {
+      const p = issue.notePath;
+      const np =
+        p === oldPath ? newPath : p.startsWith(oldPath + "/") ? newPath + p.slice(oldPath.length) : p;
+      if (np === p) return issue;
+      changed = true;
+      const noteName = basename(np);
+      return {
+        ...issue,
+        notePath: np,
+        noteName,
+        id: issueKey(np, issue.issueType, issue.sourceRuleId),
+      };
+    });
+    return changed;
+  }
+
+  /** Drop in-memory results for a deleted note. */
+  private dropLastResult(path: string): boolean {
+    if (!this.lastResult) return false;
+    const before = this.lastResult.issues.length;
+    this.lastResult.issues = this.lastResult.issues.filter((i) => i.notePath !== path);
+    return this.lastResult.issues.length !== before;
+  }
+
   /** Drop stored keys/paths for a deleted note so data.json doesn't accrete cruft. */
   private dropPath(path: string): boolean {
     const keepKey = (key: string): boolean => {
@@ -353,11 +396,17 @@ export default class NoteDoctorPlugin extends Plugin {
     await this.openNote(path);
     // Reveal-in-file-explorer has no public API; feature-detect the internal
     // command so a missing/renamed command (or mobile) degrades to just opening.
-    const commands = (this.app as unknown as AppInternals).commands;
-    if (!commands) return;
-    const id = "file-explorer:reveal-active-file";
-    const available = commands.commandExists ? commands.commandExists(id) : true;
-    if (available) commands.executeCommandById(id);
+    // Reveal is best-effort via a private command; wrap it so a shape/behavior
+    // change in a future Obsidian degrades to "note is already open".
+    try {
+      const commands = (this.app as unknown as AppInternals).commands;
+      if (!commands) return;
+      const id = "file-explorer:reveal-active-file";
+      const available = commands.commandExists ? commands.commandExists(id) : true;
+      if (available) commands.executeCommandById(id);
+    } catch {
+      /* reveal is optional */
+    }
   }
 
   // --- Review queue ---------------------------------------------------------
@@ -438,9 +487,9 @@ export default class NoteDoctorPlugin extends Plugin {
   }
 
   /**
-   * Add a frontmatter property to notes that don't already have it. Existing
-   * values are never overwritten — a cleanup tool must not clobber user data.
-   * Returns how many were set vs. skipped.
+   * Add a frontmatter property only to notes where the key is ABSENT. An existing
+   * value — even a deliberately empty one (`status: ""`, `aliases: []`) — is never
+   * touched; a cleanup tool must not clobber user data. Reports set vs. skipped.
    */
   async bulkAddProperty(paths: string[], key: string, value: string): Promise<void> {
     let set = 0;
@@ -449,7 +498,7 @@ export default class NoteDoctorPlugin extends Plugin {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        if (hasProperty(fm, key)) {
+        if (key in fm) {
           skipped++;
         } else {
           fm[key] = value;
@@ -470,10 +519,15 @@ export default class NoteDoctorPlugin extends Plugin {
       if (!(file instanceof TFile)) continue;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
         const existing = fm.tags;
+        // A scalar `tags: reading, todo` is two tags to Obsidian — split it the
+        // same way so we append rather than mangling it into one comma'd tag.
         const tags: string[] = Array.isArray(existing)
           ? existing.map((t) => String(t))
-          : typeof existing === "string" && existing.length > 0
-            ? [existing]
+          : typeof existing === "string"
+            ? existing
+                .split(/[,\s]+/)
+                .map((t) => t.replace(/^#/, "").trim())
+                .filter((t) => t.length > 0)
             : [];
         if (!tags.includes(clean)) tags.push(clean);
         fm.tags = tags;
@@ -560,4 +614,10 @@ class ProfileSuggestModal extends FuzzySuggestModal<ScanProfile> {
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+/** Basename of a vault path, without the trailing `.md`. */
+function basename(path: string): string {
+  const name = path.split("/").pop() ?? path;
+  return name.replace(/\.md$/, "");
 }
