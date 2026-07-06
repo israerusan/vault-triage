@@ -1,9 +1,11 @@
-import { Notice } from "obsidian";
+import type { App } from "obsidian";
 import { PRO_UPSELL } from "../../product";
+import { ProUpsellModal } from "./ProUpsellModal";
 
-/** Anything carrying the resolved Pro entitlement. The plugin satisfies this. */
+/** Anything carrying the resolved Pro entitlement and an app handle. */
 export interface ProHost {
   isPro: boolean;
+  app: App;
 }
 
 export function isPro(host: ProHost): boolean {
@@ -12,7 +14,7 @@ export function isPro(host: ProHost): boolean {
 
 /**
  * The one place Pro features are gated. Runs `action` when Pro is active,
- * otherwise shows a contextual upsell for `feature`. Keeping every gate here
+ * otherwise opens an actionable upsell for `feature`. Keeping every gate here
  * avoids scattered `if (isPro)` checks drifting out of sync.
  */
 export function requirePro(
@@ -24,6 +26,6 @@ export function requirePro(
     action();
     return true;
   }
-  new Notice(PRO_UPSELL[feature] ?? "This is a Note Doctor Pro feature.");
+  new ProUpsellModal(host.app, feature).open();
   return false;
 }

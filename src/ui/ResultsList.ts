@@ -105,9 +105,8 @@ function renderRow(
   title.addEventListener("click", () => void plugin.openNote(issue.notePath));
   main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
 
+  // The title already opens the note; the action strip focuses on triage.
   const actions = row.createDiv({ cls: "note-doctor-row-actions" });
-  iconButton(actions, "file-search", "Open note", () => void plugin.openNote(issue.notePath));
-
   const reviewBtn = iconButton(actions, "check", "");
   const paintReviewed = (): void => {
     const on = plugin.isReviewed(issue);

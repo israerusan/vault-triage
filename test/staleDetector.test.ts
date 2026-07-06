@@ -16,6 +16,7 @@ function noteAt(mtime: number): NoteStat {
     frontmatter: {},
     tags: [],
     inboundLinks: 0,
+    outboundLinks: 0,
   };
 }
 

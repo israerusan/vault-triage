@@ -2,7 +2,12 @@
 // only when it has a meaningful value — an empty string, empty array, null, or
 // undefined is treated as missing so "required properties" checks are useful.
 
-function isMeaningful(value: unknown): boolean {
+/**
+ * Whether a frontmatter value counts as "present". Empty string, empty array,
+ * null, and undefined are NOT meaningful — shared by the missing-properties
+ * detector and the bulk fixer so they can never disagree about emptiness.
+ */
+export function isMeaningful(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim().length > 0;
   if (Array.isArray(value)) return value.length > 0;

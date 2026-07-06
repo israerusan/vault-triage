@@ -47,6 +47,8 @@ export interface RawNoteInput {
   tags: string[];
   /** Count of resolved inbound links pointing at this note. */
   inboundLinks: number;
+  /** Count of outbound links (resolved + unresolved) this note makes. */
+  outboundLinks: number;
 }
 
 /** Normalized note snapshot the detectors and rule engine actually read. */
@@ -60,6 +62,7 @@ export interface NoteStat {
   frontmatter: Record<string, unknown>;
   tags: string[];
   inboundLinks: number;
+  outboundLinks: number;
 }
 
 // --- Detector output --------------------------------------------------------
@@ -126,6 +129,8 @@ export interface LastScanSummary {
   scannedAt: string;
   totalFiles: number;
   totalIssues: number;
+  /** Distinct notes with at least one issue (the honest "needs attention" count). */
+  affectedNotes: number;
   byType: Record<string, number>;
   profileId?: string;
 }

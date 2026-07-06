@@ -14,7 +14,8 @@ import { ReviewQueueModal } from "./ui/ReviewQueueModal";
 import { scanVault, resolveScanConfig } from "./core/scan/scanVault";
 import { countByType } from "./core/rules/severity";
 import { buildMarkdownReport } from "./core/reports/markdownReport";
-import { issueKey } from "./core/utils/ids";
+import { issueKey, issueKeyPath } from "./core/utils/ids";
+import { isMeaningful } from "./core/utils/frontmatter";
 import { LicenseManager } from "./core/license/LicenseManager";
 import { requirePro } from "./ui/pro/ProGate";
 import { PRODUCT_NAME } from "./product";
@@ -54,6 +55,9 @@ export default class NoteDoctorPlugin extends Plugin {
   /** O(1) mirrors of the ignored/reviewed key arrays (rebuilt on load/mutation). */
   private ignoredSet = new Set<string>();
   private reviewedSet = new Set<string>();
+
+  /** Debounce handle for coalescing rapid ignore/reviewed writes. */
+  private saveTimer: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -136,7 +140,32 @@ export default class NoteDoctorPlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
+    if (this.saveTimer !== null) {
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
     await this.saveData(this.settings);
+  }
+
+  /** Coalesce a burst of toggles into one write (in-memory state is already current). */
+  private scheduleSave(): void {
+    if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
+      this.saveTimer = null;
+      void this.saveData(this.settings);
+    }, 400);
+  }
+
+  /** Flush any pending debounced write immediately (on close / unload). */
+  flushPendingSave(): void {
+    if (this.saveTimer === null) return;
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    void this.saveData(this.settings);
+  }
+
+  onunload(): void {
+    this.flushPendingSave();
   }
 
   private rebuildKeySets(): void {
@@ -230,6 +259,7 @@ export default class NoteDoctorPlugin extends Plugin {
         scannedAt,
         totalFiles,
         totalIssues: issues.length,
+        affectedNotes: new Set(issues.map((i) => i.notePath)).size,
         byType: countByType(issues),
         profileId,
       };
@@ -268,15 +298,15 @@ export default class NoteDoctorPlugin extends Plugin {
     return this.reviewedSet.has(issue.id);
   }
 
-  /** Persist an ignore/reviewed toggle. Callers update their own UI in place. */
+  /** Persist an ignore/reviewed toggle (debounced). Callers update UI in place. */
   async setIgnored(issue: NoteIssue, ignored: boolean): Promise<void> {
     this.applyKey(this.ignoredSet, "ignoredIssueKeys", issue.id, ignored);
-    await this.saveSettings();
+    this.scheduleSave();
   }
 
   async setReviewed(issue: NoteIssue, reviewed: boolean): Promise<void> {
     this.applyKey(this.reviewedSet, "reviewedIssueKeys", issue.id, reviewed);
-    await this.saveSettings();
+    this.scheduleSave();
   }
 
   private applyKey(
@@ -305,9 +335,8 @@ export default class NoteDoctorPlugin extends Plugin {
   /** Rewrite stored keys/paths when a note (or folder) is renamed or moved. */
   private migratePath(oldPath: string, newPath: string): boolean {
     const remapKey = (key: string): string => {
-      const sep = key.indexOf("::");
-      const p = sep === -1 ? key : key.slice(0, sep);
-      const rest = sep === -1 ? "" : key.slice(sep);
+      const p = issueKeyPath(key);
+      const rest = key.slice(p.length); // separator + type (+ ruleId)
       if (p === oldPath) return newPath + rest;
       if (p.startsWith(oldPath + "/")) return newPath + p.slice(oldPath.length) + rest;
       return key;
@@ -364,10 +393,7 @@ export default class NoteDoctorPlugin extends Plugin {
 
   /** Drop stored keys/paths for a deleted note so data.json doesn't accrete cruft. */
   private dropPath(path: string): boolean {
-    const keepKey = (key: string): boolean => {
-      const sep = key.indexOf("::");
-      return (sep === -1 ? key : key.slice(0, sep)) !== path;
-    };
+    const keepKey = (key: string): boolean => issueKeyPath(key) !== path;
     const beforeLen =
       this.settings.ignoredIssueKeys.length +
       this.settings.reviewedIssueKeys.length +
@@ -498,7 +524,9 @@ export default class NoteDoctorPlugin extends Plugin {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        if (key in fm) {
+        // Match the detector's notion of "present": fill absent AND empty values
+        // (`status:` / `status: ""`), skip only meaningful ones.
+        if (isMeaningful(fm[key])) {
           skipped++;
         } else {
           fm[key] = value;

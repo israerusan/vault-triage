@@ -30,7 +30,7 @@ export class ProfileEditModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    this.setTitle(this.existing ? "Edit profile" : "New profile");
+    this.titleEl.setText(this.existing ? "Edit profile" : "New profile");
 
     new Setting(contentEl).setName("Name").addText((t) =>
       t.setPlaceholder("Weekly Review").setValue(this.name).onChange((v) => (this.name = v))
@@ -85,6 +85,9 @@ export class ProfileEditModal extends Modal {
       return;
     }
     const profile: ScanProfile = {
+      // Preserve any override fields the modal doesn't surface (thresholds,
+      // custom-rule scoping) so editing a profile never silently drops them.
+      ...this.existing,
       id: this.existing?.id ?? newId("profile"),
       name: this.name.trim() || "Untitled profile",
       enabledIssueTypes,

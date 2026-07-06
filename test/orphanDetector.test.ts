@@ -4,7 +4,7 @@ import type { NoteStat } from "../src/types";
 
 const NOW = Date.parse("2026-07-05T00:00:00Z");
 
-function makeStat(inboundLinks: number): NoteStat {
+function makeStat(inboundLinks: number, outboundLinks: number): NoteStat {
   return {
     path: "notes/example.md",
     name: "example",
@@ -14,24 +14,24 @@ function makeStat(inboundLinks: number): NoteStat {
     frontmatter: {},
     tags: [],
     inboundLinks,
+    outboundLinks,
   };
 }
 
-// True case: zero inbound links is an orphan.
-const zeroHit = orphanDetector(makeStat(0));
-assert.notStrictEqual(zeroHit, null);
-assert.strictEqual(zeroHit?.reason, "No notes link here");
-assert.strictEqual(zeroHit?.details, undefined);
+// True case: no inbound AND no outbound links is a (truly disconnected) orphan.
+const isolated = orphanDetector(makeStat(0, 0));
+assert.notStrictEqual(isolated, null);
+assert.strictEqual(isolated?.reason, "No links in or out");
+assert.strictEqual(isolated?.details, undefined);
 
-// Boundary case: exactly one inbound link is not an orphan.
-assert.strictEqual(orphanDetector(makeStat(1)), null);
+// A note that links OUT (index / map-of-content) is not an orphan even with no inbound.
+assert.strictEqual(orphanDetector(makeStat(0, 4)), null);
 
-// False case: many inbound links is not an orphan.
-assert.strictEqual(orphanDetector(makeStat(5)), null);
+// A note that is linked to is not an orphan.
+assert.strictEqual(orphanDetector(makeStat(1, 0)), null);
+assert.strictEqual(orphanDetector(makeStat(5, 2)), null);
 
-// Defensive case: negative link count is still treated as an orphan.
-const negativeHit = orphanDetector(makeStat(-3));
-assert.notStrictEqual(negativeHit, null);
-assert.strictEqual(negativeHit?.reason, "No notes link here");
+// Defensive: negative counts are still treated as zero.
+assert.notStrictEqual(orphanDetector(makeStat(-3, 0)), null);
 
 console.log("orphanDetector tests passed");

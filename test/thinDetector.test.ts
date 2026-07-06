@@ -14,6 +14,7 @@ function makeStat(charCount: number): NoteStat {
     frontmatter: {},
     tags: [],
     inboundLinks: 0,
+    outboundLinks: 0,
   };
 }
 

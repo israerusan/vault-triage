@@ -43,7 +43,7 @@ export class RuleEditModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    this.setTitle(this.existing ? "Edit rule" : "New rule");
+    this.titleEl.setText(this.existing ? "Edit rule" : "New rule");
 
     new Setting(contentEl).setName("Name").addText((t) =>
       t.setValue(this.name).onChange((v) => (this.name = v))

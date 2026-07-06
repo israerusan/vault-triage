@@ -6,7 +6,7 @@ import { countByType, sortIssues } from "../core/rules/severity";
 import { renderResultsList } from "./ResultsList";
 import { requirePro } from "./pro/ProGate";
 import { PromptModal } from "./PromptModal";
-import { PRO_TAGLINE, PURCHASE_URL } from "../product";
+import { PRO_PRICE_LABEL, PRO_TAGLINE, PURCHASE_URL } from "../product";
 
 export const VIEW_TYPE_NOTE_DOCTOR = "note-doctor-dashboard";
 
@@ -96,12 +96,17 @@ export class NoteDoctorView extends ItemView {
     this.renderToolbar(root);
     if (this.bulkMode) this.renderBulkBar(root);
 
-    renderResultsList(root.createDiv(), this.plugin, this.applyView(issues), {
-      bulkMode: this.bulkMode,
-      selected: this.selected,
-      onSelectionChange: () => this.updateSelCount(),
-      onCountsChanged: () => this.refreshMeta(),
-    });
+    // When the whole vault is clean the hero stat already says so — don't stack a
+    // second "nice and tidy" empty-state under it. (A filtered-empty view still
+    // renders its own message.)
+    if (issues.length > 0 || this.filter !== "all") {
+      renderResultsList(root.createDiv(), this.plugin, this.applyView(issues), {
+        bulkMode: this.bulkMode,
+        selected: this.selected,
+        onSelectionChange: () => this.updateSelCount(),
+        onCountsChanged: () => this.refreshMeta(),
+      });
+    }
 
     if (!this.plugin.isPro) this.renderProCta(root);
   }
@@ -162,16 +167,17 @@ export class NoteDoctorView extends ItemView {
       return;
     }
     host.empty();
+    const affected = summary.affectedNotes ?? summary.totalIssues;
     const stat = host.createDiv({ cls: "note-doctor-stat" });
-    stat.createSpan({ cls: "note-doctor-stat-num", text: String(summary.totalIssues) });
+    stat.createSpan({ cls: "note-doctor-stat-num", text: String(affected) });
     stat.createSpan({
       cls: "note-doctor-stat-label",
-      text: summary.totalIssues === 1 ? "note needed attention" : "notes needed attention",
+      text: affected === 1 ? "note needed attention" : "notes needed attention",
     });
     host
       .createDiv({ cls: "note-doctor-summary" })
       .setText(
-        `Last scan ${relativeTime(summary.scannedAt)} · ${summary.totalFiles} notes · run a scan to review`
+        `Last scan ${relativeTime(summary.scannedAt)} · ${summary.totalIssues} issues · run a scan to review`
       );
     const tiles = host.createDiv({ cls: "note-doctor-tiles" });
     for (const type of ISSUE_TYPES) {
@@ -188,14 +194,16 @@ export class NoteDoctorView extends ItemView {
     if (!host) return;
     host.empty();
 
+    // The hero counts affected NOTES, not raw issues (one note can trip several).
+    const affected = new Set(issues.map((i) => i.notePath)).size;
     const stat = host.createDiv({ cls: "note-doctor-stat" });
-    stat.createSpan({ cls: "note-doctor-stat-num", text: String(issues.length) });
+    stat.createSpan({ cls: "note-doctor-stat-num", text: String(affected) });
     stat.createSpan({
       cls: "note-doctor-stat-label",
       text:
-        issues.length === 0
+        affected === 0
           ? "your vault is clean"
-          : issues.length === 1
+          : affected === 1
             ? "note needs attention"
             : "notes need attention",
     });
@@ -203,10 +211,20 @@ export class NoteDoctorView extends ItemView {
     this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
     const last = this.plugin.lastResult;
     if (last) {
-      this.summaryEl.setText(`Scanned ${relativeTime(last.scannedAt)} · ${last.totalFiles} notes`);
+      const issueWord = issues.length === 1 ? "issue" : "issues";
+      this.summaryEl.setText(
+        `${issues.length} ${issueWord} · scanned ${relativeTime(last.scannedAt)} · ${last.totalFiles} notes`
+      );
     }
 
     this.renderTiles(host, issues);
+
+    if (issues.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
+      host.createDiv({
+        cls: "note-doctor-nudge",
+        text: "Tip: add fields under Required properties in settings to also catch missing metadata.",
+      });
+    }
   }
 
   private renderTiles(host: HTMLElement, issues: NoteIssue[]): void {
@@ -351,10 +369,10 @@ export class NoteDoctorView extends ItemView {
 
   private renderProCta(root: HTMLElement): void {
     const card = root.createDiv({ cls: "note-doctor-pro-cta" });
-    card.createEl("strong", { text: "Note Doctor Pro" });
+    card.createEl("strong", { text: `Note Doctor Pro — ${PRO_PRICE_LABEL}` });
     card.createDiv({ text: PRO_TAGLINE });
     card.createEl("a", {
-      text: "Unlock Pro",
+      text: `Get Pro — ${PRO_PRICE_LABEL}`,
       cls: "note-doctor-cta-link",
       href: PURCHASE_URL,
     });

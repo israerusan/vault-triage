@@ -13,6 +13,7 @@ function makeInput(overrides: Partial<RawNoteInput>): RawNoteInput {
     frontmatter: {},
     tags: [],
     inboundLinks: 0,
+  outboundLinks: 2,
     ...overrides,
   };
 }
@@ -26,6 +27,7 @@ const passInput = makeInput({
   frontmatter: { status: "draft" },
   tags: ["project", "wip"],
   inboundLinks: 3,
+  outboundLinks: 2,
 });
 const stat = buildNoteStat(passInput);
 assert.strictEqual(stat.path, "folder/note.md");

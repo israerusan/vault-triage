@@ -10,9 +10,12 @@ export const PRO_NAME = "Note Doctor Pro";
 /** Where "Unlock Pro" sends people. Confirm the real handle before release. */
 export const PURCHASE_URL = "https://buymeacoffee.com/notedoctor";
 
+/** One-time price. Kept in one place so every surface stays consistent. */
+export const PRO_PRICE_LABEL = "$12 one-time";
+
 /** One-line pitch for the Pro tier, reused across upsell surfaces. */
 export const PRO_TAGLINE =
-  "Pro unlocks saved audits, custom rules, bulk actions, and report export.";
+  "Saved audits, custom rules, bulk actions, and report export. $12 one-time, no subscription, no account.";
 
 /** Contextual upsell copy, keyed by the feature the user reached for. */
 export const PRO_UPSELL: Record<string, string> = {
@@ -20,6 +23,6 @@ export const PRO_UPSELL: Record<string, string> = {
   rules: "Custom rules are a Pro feature. " + PRO_TAGLINE,
   bulk: "Bulk actions are a Pro feature. " + PRO_TAGLINE,
   export: "Report export is a Pro feature. " + PRO_TAGLINE,
-  review: "Advanced review workflows are a Pro feature. " + PRO_TAGLINE,
+  review: "Fixing notes without leaving the review queue is a Pro feature. " + PRO_TAGLINE,
   severity: "Severity tuning is a Pro feature. " + PRO_TAGLINE,
 };

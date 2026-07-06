@@ -19,5 +19,6 @@ export function buildNoteStat(input: RawNoteInput): NoteStat {
     frontmatter: input.frontmatter,
     tags: input.tags,
     inboundLinks: input.inboundLinks,
+    outboundLinks: input.outboundLinks,
   };
 }

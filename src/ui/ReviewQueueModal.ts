@@ -21,7 +21,7 @@ export class ReviewQueueModal extends Modal {
   }
 
   onOpen(): void {
-    this.setTitle("Review flagged notes");
+    this.titleEl.setText("Review flagged notes");
     this.modalEl.addClass("note-doctor-review-modal");
     this.registerKeys();
     this.renderCurrent();
@@ -29,7 +29,8 @@ export class ReviewQueueModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
-    // Reflect anything reviewed/ignored/excluded during the session on the dashboard.
+    // Flush debounced review marks and reflect them on the dashboard.
+    this.plugin.flushPendingSave();
     this.plugin.refreshViews();
   }
 
@@ -40,6 +41,7 @@ export class ReviewQueueModal extends Modal {
     this.scope.register([], "i", () => void this.ignoreCurrent());
     this.scope.register([], "e", () => void this.excludeCurrent());
     this.scope.register([], "o", () => void this.openCurrent());
+    this.scope.register([], "p", () => this.quickAddProperty());
   }
 
   private current(): NoteIssue | null {
@@ -91,7 +93,7 @@ export class ReviewQueueModal extends Modal {
     this.actionButton(actions, "eye-off", "Ignore (i)", () => void this.ignoreCurrent());
     this.actionButton(actions, "ban", "Exclude note (e)", () => void this.excludeCurrent());
     // Pro: fix the note without leaving the queue.
-    this.actionButton(actions, "wand", "Add a property (Pro)", () => this.quickAddProperty());
+    this.actionButton(actions, "wand-2", "Add a property (p) — Pro", () => this.quickAddProperty());
 
     const nav = contentEl.createDiv({ cls: "note-doctor-review-nav" });
     const prev = nav.createEl("button", { text: "Previous" });
@@ -108,7 +110,7 @@ export class ReviewQueueModal extends Modal {
     tooltip: string,
     onClick: () => void
   ): void {
-    const btn = parent.createDiv({ cls: "note-doctor-icon-btn" });
+    const btn = parent.createEl("button", { cls: "note-doctor-icon-btn clickable-icon" });
     setIcon(btn, icon);
     btn.setAttribute("aria-label", tooltip);
     btn.addEventListener("click", onClick);

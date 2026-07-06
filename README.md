@@ -28,7 +28,7 @@ The free version detects:
 
 - **Stale notes** — not modified in a while
 - **Thin notes** — barely any content
-- **Orphan notes** — nothing links to them
+- **Orphan notes** — no links in or out (truly disconnected)
 - **Missing required properties** — frontmatter fields you rely on are absent
 - **Draft markers** — `TODO`, `FIXME`, `draft`, `incomplete`
 
@@ -45,7 +45,7 @@ The free version detects:
 | Saved scan profiles        |  No  | Yes |
 | Custom rules               |  No  | Yes |
 | Bulk actions               |  No  | Yes |
-| Advanced review workflows  |  No  | Yes |
+| In-queue quick fixes       |  No  | Yes |
 | Severity tuning            |  No  | Yes |
 | Export Markdown reports    |  No  | Yes |
 

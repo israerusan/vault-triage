@@ -158,7 +158,9 @@
   padding: var(--size-2-1) var(--size-4-1);
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
-  color: var(--text-on-accent);
+  /* Fixed light text — the --color-* fills are saturated in both themes, so we
+     can't rely on --text-on-accent (which tracks the theme accent, not these). */
+  color: #fff;
   white-space: nowrap;
 }
 
@@ -266,6 +268,35 @@ a.note-doctor-cta-link:hover {
   width: 0;
   background: var(--interactive-accent);
   transition: width 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-doctor-progress-bar {
+    transition: none;
+  }
+}
+
+/* Contextual "add required properties" nudge */
+.note-doctor-nudge {
+  margin-top: var(--size-4-2);
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* Pro upsell modal */
+.note-doctor-upsell-lead {
+  margin-bottom: var(--size-2-2);
+}
+
+.note-doctor-upsell-sub {
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-upsell-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
 }
 
 /* Windowed results: "show more" footer */

@@ -24,7 +24,7 @@ export class PromptModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    this.setTitle(this.title);
+    this.titleEl.setText(this.title);
 
     for (const field of this.fields) {
       this.values[field.key] = "";

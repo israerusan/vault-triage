@@ -19,6 +19,7 @@ function makeStat(overrides: Partial<NoteStat> = {}): NoteStat {
     frontmatter: {},
     tags: [],
     inboundLinks: 0,
+    outboundLinks: 0,
     ...overrides,
   };
 }

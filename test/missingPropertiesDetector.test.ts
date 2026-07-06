@@ -14,6 +14,7 @@ function makeStat(frontmatter: Record<string, unknown>): NoteStat {
     frontmatter,
     tags: [],
     inboundLinks: 1,
+    outboundLinks: 0,
   };
 }
 

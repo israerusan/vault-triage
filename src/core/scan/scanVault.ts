@@ -44,7 +44,7 @@ export async function scanVault(
   now: number,
   onProgress?: ScanProgress
 ): Promise<ScanResult> {
-  const inbound = buildInboundCounts(app);
+  const { inbound, outbound } = buildLinkCounts(app);
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
   const issues: NoteIssue[] = [];
 
@@ -83,6 +83,7 @@ export async function scanVault(
         frontmatter: c.frontmatter,
         tags: c.tags,
         inboundLinks: inbound.get(c.file.path) ?? 0,
+        outboundLinks: outbound.get(c.file.path) ?? 0,
       });
 
       if (enabled.has("stale")) {
@@ -122,6 +123,10 @@ export async function scanVault(
       }
     });
     onProgress?.(Math.min(i + READ_BATCH, totalFiles), totalFiles);
+    // Yield a real macrotask so the UI can paint the progress bar and stay
+    // responsive — cachedRead resolves on the microtask queue for unchanged
+    // files (warm re-scans), which would otherwise never let the loop breathe.
+    await new Promise<void>((resolve) => window.setTimeout(resolve));
   }
 
   return { issues: sortIssues(issues, config.sortMode), totalFiles };
@@ -193,19 +198,36 @@ function pushHit(
   });
 }
 
-/** Reverse the resolved-link graph into an inbound-count-per-note map. */
-function buildInboundCounts(app: App): Map<string, number> {
-  const counts = new Map<string, number>();
+/** Per-note inbound and outbound link counts, ignoring self-links. */
+function buildLinkCounts(app: App): {
+  inbound: Map<string, number>;
+  outbound: Map<string, number>;
+} {
+  const inbound = new Map<string, number>();
+  const outbound = new Map<string, number>();
+  const add = (map: Map<string, number>, key: string, n: number): void => {
+    map.set(key, (map.get(key) ?? 0) + n);
+  };
+
   const resolved = app.metadataCache.resolvedLinks;
   for (const source of Object.keys(resolved)) {
     const targets = resolved[source];
     for (const target of Object.keys(targets)) {
-      // A note linking to itself doesn't make it non-orphan.
-      if (target === source) continue;
-      counts.set(target, (counts.get(target) ?? 0) + targets[target]);
+      if (target === source) continue; // a self-link is not a real connection
+      add(inbound, target, targets[target]);
+      add(outbound, source, targets[target]);
     }
   }
-  return counts;
+
+  // Unresolved links still count as the source note reaching outward.
+  const unresolved = app.metadataCache.unresolvedLinks;
+  for (const source of Object.keys(unresolved)) {
+    for (const count of Object.values(unresolved[source])) {
+      add(outbound, source, count);
+    }
+  }
+
+  return { inbound, outbound };
 }
 
 function extractTags(cache: CachedMetadata | null): string[] {
