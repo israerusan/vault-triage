@@ -2,6 +2,8 @@ import { App, Modal, Notice, setIcon } from "obsidian";
 import type NoteDoctorPlugin from "../main";
 import type { NoteIssue } from "../types";
 import { ISSUE_TYPE_LABELS } from "../types";
+import { PromptModal } from "./PromptModal";
+import { requirePro } from "./pro/ProGate";
 
 /**
  * Work through flagged notes one at a time. Arrow keys move between issues;
@@ -19,6 +21,7 @@ export class ReviewQueueModal extends Modal {
   }
 
   onOpen(): void {
+    this.setTitle("Review flagged notes");
     this.modalEl.addClass("note-doctor-review-modal");
     this.registerKeys();
     this.renderCurrent();
@@ -26,6 +29,8 @@ export class ReviewQueueModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+    // Reflect anything reviewed/ignored/excluded during the session on the dashboard.
+    this.plugin.refreshViews();
   }
 
   private registerKeys(): void {
@@ -85,6 +90,8 @@ export class ReviewQueueModal extends Modal {
     );
     this.actionButton(actions, "eye-off", "Ignore (i)", () => void this.ignoreCurrent());
     this.actionButton(actions, "ban", "Exclude note (e)", () => void this.excludeCurrent());
+    // Pro: fix the note without leaving the queue.
+    this.actionButton(actions, "wand", "Add a property (Pro)", () => this.quickAddProperty());
 
     const nav = contentEl.createDiv({ cls: "note-doctor-review-nav" });
     const prev = nav.createEl("button", { text: "Previous" });
@@ -110,6 +117,27 @@ export class ReviewQueueModal extends Modal {
   private async openCurrent(): Promise<void> {
     const issue = this.current();
     if (issue) await this.plugin.openNote(issue.notePath);
+  }
+
+  /** Pro: set a frontmatter property on the current note, then advance. */
+  private quickAddProperty(): void {
+    const issue = this.current();
+    if (!issue) return;
+    requirePro(this.plugin, "review", () => {
+      new PromptModal(
+        this.app,
+        `Add a property to "${issue.noteName}"`,
+        [
+          { key: "key", label: "Property", placeholder: "status" },
+          { key: "value", label: "Value", placeholder: "reviewed" },
+        ],
+        (v) => {
+          if (v.key.trim()) {
+            void this.plugin.bulkAddProperty([issue.notePath], v.key.trim(), v.value);
+          }
+        }
+      ).open();
+    });
   }
 
   private async toggleReviewed(): Promise<void> {

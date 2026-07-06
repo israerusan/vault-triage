@@ -1,4 +1,6 @@
 import {
+  App,
+  FuzzySuggestModal,
   Notice,
   Plugin,
   TFile,
@@ -12,7 +14,7 @@ import { ReviewQueueModal } from "./ui/ReviewQueueModal";
 import { scanVault, resolveScanConfig } from "./core/scan/scanVault";
 import { countByType } from "./core/rules/severity";
 import { buildMarkdownReport } from "./core/reports/markdownReport";
-import { issueKey } from "./core/utils/ids";
+import { hasProperty } from "./core/utils/frontmatter";
 import { LicenseManager } from "./core/license/LicenseManager";
 import { requirePro } from "./ui/pro/ProGate";
 import { PRODUCT_NAME } from "./product";
@@ -20,6 +22,7 @@ import { PRODUCT_NAME } from "./product";
 /** Obsidian's internal command runner — not in the public typings. */
 interface CommandsApi {
   executeCommandById: (id: string) => boolean;
+  commandExists?: (id: string) => boolean;
 }
 type AppInternals = { commands?: CommandsApi };
 
@@ -33,7 +36,7 @@ export interface ScanRun {
 const REPORT_FOLDER = "Note Doctor Reports";
 
 export default class NoteDoctorPlugin extends Plugin {
-  settings: NoteDoctorSettings = DEFAULT_SETTINGS;
+  settings: NoteDoctorSettings = structuredClone(DEFAULT_SETTINGS);
 
   /** Pro entitlement, derived from the license key on load / change. */
   isPro = false;
@@ -42,6 +45,15 @@ export default class NoteDoctorPlugin extends Plugin {
 
   /** The most recent scan, held in memory for the dashboard and export. */
   lastResult: ScanRun | null = null;
+
+  /** In-flight scan state, so the UI can show progress and block re-entry. */
+  scanning = false;
+  scanDone = 0;
+  scanTotal = 0;
+
+  /** O(1) mirrors of the ignored/reviewed key arrays (rebuilt on load/mutation). */
+  private ignoredSet = new Set<string>();
+  private reviewedSet = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -79,13 +91,25 @@ export default class NoteDoctorPlugin extends Plugin {
       callback: () => this.exportReportCommand(),
     });
 
+    // Keep dismissed/excluded state attached to notes as they move or disappear.
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (this.migratePath(oldPath, file.path)) void this.saveSettings();
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", (file) => {
+        if (this.dropPath(file.path)) void this.saveSettings();
+      })
+    );
+
     this.addSettingTab(new NoteDoctorSettingTab(this.app, this));
   }
 
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Partial<NoteDoctorSettings> | null;
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
-    // Defensive: make sure array fields are arrays and weights are complete.
+    // Clone the defaults so live settings never alias the module-level arrays.
+    this.settings = Object.assign(structuredClone(DEFAULT_SETTINGS), data);
     this.settings.severityWeights = {
       ...DEFAULT_SETTINGS.severityWeights,
       ...(this.settings.severityWeights ?? {}),
@@ -105,10 +129,16 @@ export default class NoteDoctorPlugin extends Plugin {
         (this.settings as unknown as Record<string, unknown>)[key] = [];
       }
     }
+    this.rebuildKeySets();
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private rebuildKeySets(): void {
+    this.ignoredSet = new Set(this.settings.ignoredIssueKeys);
+    this.reviewedSet = new Set(this.settings.reviewedIssueKeys);
   }
 
   /** Re-verify the stored license key and update the Pro entitlement flags. */
@@ -141,15 +171,20 @@ export default class NoteDoctorPlugin extends Plugin {
   }
 
   refreshViews(): void {
-    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_NOTE_DOCTOR)) {
-      const view = leaf.view;
-      if (view instanceof NoteDoctorView) view.render();
-    }
+    for (const view of this.views()) view.render();
+  }
+
+  private views(): NoteDoctorView[] {
+    return this.app.workspace
+      .getLeavesOfType(VIEW_TYPE_NOTE_DOCTOR)
+      .map((leaf) => leaf.view)
+      .filter((v): v is NoteDoctorView => v instanceof NoteDoctorView);
   }
 
   // --- Scanning -------------------------------------------------------------
 
   async runScan(profileId?: string): Promise<void> {
+    if (this.scanning) return; // re-entrancy guard: ignore overlapping triggers
     const profile = profileId
       ? this.settings.savedProfiles.find((p) => p.id === profileId)
       : undefined;
@@ -158,81 +193,151 @@ export default class NoteDoctorPlugin extends Plugin {
       return;
     }
 
-    const config = resolveScanConfig(this.settings, profile);
-    const now = Date.now();
-    const { issues, totalFiles } = await scanVault(this.app, config, this.isPro, now);
-    const scannedAt = new Date(now).toISOString();
+    this.scanning = true;
+    this.scanDone = 0;
+    this.scanTotal = 0;
+    this.refreshViews(); // show the scanning state (disabled button + progress line)
 
-    this.lastResult = { issues, totalFiles, scannedAt, profileId };
-    this.settings.lastScanSummary = {
-      scannedAt,
-      totalFiles,
-      totalIssues: issues.length,
-      byType: countByType(issues),
-      profileId,
-    };
-    await this.saveSettings();
-    this.refreshViews();
+    try {
+      const config = resolveScanConfig(this.settings, profile);
+      const now = Date.now();
+      const { issues, totalFiles } = await scanVault(
+        this.app,
+        config,
+        this.isPro,
+        now,
+        (done, total) => {
+          this.scanDone = done;
+          this.scanTotal = total;
+          for (const view of this.views()) view.showScanProgress(done, total);
+        }
+      );
+      const scannedAt = new Date(now).toISOString();
 
-    const visible = this.visibleIssues().length;
-    new Notice(`${PRODUCT_NAME}: ${visible} issue(s) across ${totalFiles} note(s).`);
+      this.lastResult = { issues, totalFiles, scannedAt, profileId };
+      this.settings.lastScanSummary = {
+        scannedAt,
+        totalFiles,
+        totalIssues: issues.length,
+        byType: countByType(issues),
+        profileId,
+      };
+      this.settings.onboardingDismissed = true;
+      await this.saveSettings();
+
+      const visible = this.visibleIssues().length;
+      new Notice(`${PRODUCT_NAME}: ${visible} issue(s) across ${totalFiles} note(s).`);
+    } finally {
+      this.scanning = false;
+      this.refreshViews();
+    }
   }
 
   private async runScanAndReveal(): Promise<void> {
-    await this.runScan();
     await this.activateView();
+    await this.runScan();
   }
 
   /** Issues from the last scan minus the ones the user has ignored. */
   visibleIssues(): NoteIssue[] {
     if (!this.lastResult) return [];
-    const ignored = new Set(this.settings.ignoredIssueKeys);
-    return this.lastResult.issues.filter((i) => !ignored.has(i.id));
+    return this.lastResult.issues.filter((i) => !this.ignoredSet.has(i.id));
   }
 
   // --- Ignore / reviewed / exclude ------------------------------------------
 
   isIgnored(issue: NoteIssue): boolean {
-    return this.settings.ignoredIssueKeys.includes(issue.id);
+    return this.ignoredSet.has(issue.id);
   }
 
   isReviewed(issue: NoteIssue): boolean {
-    return this.settings.reviewedIssueKeys.includes(issue.id);
+    return this.reviewedSet.has(issue.id);
   }
 
+  /** Persist an ignore/reviewed toggle. Callers update their own UI in place. */
   async setIgnored(issue: NoteIssue, ignored: boolean): Promise<void> {
-    await this.toggleKey("ignoredIssueKeys", issue.id, ignored);
-    this.refreshViews();
-  }
-
-  async setReviewed(issue: NoteIssue, reviewed: boolean): Promise<void> {
-    await this.toggleKey("reviewedIssueKeys", issue.id, reviewed);
-    this.refreshViews();
-  }
-
-  private async toggleKey(
-    field: "ignoredIssueKeys" | "reviewedIssueKeys",
-    key: string,
-    on: boolean
-  ): Promise<void> {
-    const set = new Set(this.settings[field]);
-    if (on) set.add(key);
-    else set.delete(key);
-    this.settings[field] = [...set];
+    this.applyKey(this.ignoredSet, "ignoredIssueKeys", issue.id, ignored);
     await this.saveSettings();
   }
 
-  /** Exclude a note's path from all future scans. */
+  async setReviewed(issue: NoteIssue, reviewed: boolean): Promise<void> {
+    this.applyKey(this.reviewedSet, "reviewedIssueKeys", issue.id, reviewed);
+    await this.saveSettings();
+  }
+
+  private applyKey(
+    set: Set<string>,
+    field: "ignoredIssueKeys" | "reviewedIssueKeys",
+    key: string,
+    on: boolean
+  ): void {
+    if (on) set.add(key);
+    else set.delete(key);
+    this.settings[field] = [...set];
+  }
+
+  /** Exclude a note's path from all future scans. Caller refreshes its own UI. */
   async excludeNote(path: string): Promise<void> {
     if (!this.settings.excludedPaths.includes(path)) {
       this.settings.excludedPaths = [...this.settings.excludedPaths, path];
-      await this.saveSettings();
     }
     if (this.lastResult) {
       this.lastResult.issues = this.lastResult.issues.filter((i) => i.notePath !== path);
     }
-    this.refreshViews();
+    await this.saveSettings();
     new Notice(`${PRODUCT_NAME}: excluded ${path} from future scans.`);
+  }
+
+  /** Rewrite stored keys/paths when a note (or folder) is renamed or moved. */
+  private migratePath(oldPath: string, newPath: string): boolean {
+    const remapKey = (key: string): string => {
+      const sep = key.indexOf("::");
+      const p = sep === -1 ? key : key.slice(0, sep);
+      const rest = sep === -1 ? "" : key.slice(sep);
+      if (p === oldPath) return newPath + rest;
+      if (p.startsWith(oldPath + "/")) return newPath + p.slice(oldPath.length) + rest;
+      return key;
+    };
+    const remapPath = (p: string): string =>
+      p === oldPath ? newPath : p.startsWith(oldPath + "/") ? newPath + p.slice(oldPath.length) : p;
+
+    const before = JSON.stringify([
+      this.settings.ignoredIssueKeys,
+      this.settings.reviewedIssueKeys,
+      this.settings.excludedPaths,
+    ]);
+    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.map(remapKey);
+    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.map(remapKey);
+    this.settings.excludedPaths = this.settings.excludedPaths.map(remapPath);
+    this.rebuildKeySets();
+    return (
+      JSON.stringify([
+        this.settings.ignoredIssueKeys,
+        this.settings.reviewedIssueKeys,
+        this.settings.excludedPaths,
+      ]) !== before
+    );
+  }
+
+  /** Drop stored keys/paths for a deleted note so data.json doesn't accrete cruft. */
+  private dropPath(path: string): boolean {
+    const keepKey = (key: string): boolean => {
+      const sep = key.indexOf("::");
+      return (sep === -1 ? key : key.slice(0, sep)) !== path;
+    };
+    const beforeLen =
+      this.settings.ignoredIssueKeys.length +
+      this.settings.reviewedIssueKeys.length +
+      this.settings.excludedPaths.length;
+    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.filter(keepKey);
+    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.filter(keepKey);
+    this.settings.excludedPaths = this.settings.excludedPaths.filter((p) => p !== path);
+    this.rebuildKeySets();
+    const afterLen =
+      this.settings.ignoredIssueKeys.length +
+      this.settings.reviewedIssueKeys.length +
+      this.settings.excludedPaths.length;
+    return afterLen !== beforeLen;
   }
 
   // --- Navigation -----------------------------------------------------------
@@ -246,8 +351,13 @@ export default class NoteDoctorPlugin extends Plugin {
 
   async revealNote(path: string): Promise<void> {
     await this.openNote(path);
+    // Reveal-in-file-explorer has no public API; feature-detect the internal
+    // command so a missing/renamed command (or mobile) degrades to just opening.
     const commands = (this.app as unknown as AppInternals).commands;
-    commands?.executeCommandById("file-explorer:reveal-active-file");
+    if (!commands) return;
+    const id = "file-explorer:reveal-active-file";
+    const available = commands.commandExists ? commands.commandExists(id) : true;
+    if (available) commands.executeCommandById(id);
   }
 
   // --- Review queue ---------------------------------------------------------
@@ -282,11 +392,16 @@ export default class NoteDoctorPlugin extends Plugin {
         new Notice("Note Doctor: no saved profiles yet. Create one in settings.");
         return;
       }
-      // The command runs the first saved profile; the dashboard offers a picker.
-      void (async () => {
-        await this.runScan(profiles[0].id);
-        await this.activateView();
-      })();
+      const run = (id: string): void =>
+        void (async () => {
+          await this.activateView();
+          await this.runScan(id);
+        })();
+      if (profiles.length === 1) {
+        run(profiles[0].id);
+        return;
+      }
+      new ProfileSuggestModal(this.app, profiles, (p) => run(p.id)).open();
     });
   }
 
@@ -307,34 +422,43 @@ export default class NoteDoctorPlugin extends Plugin {
   // --- Pro: bulk actions ----------------------------------------------------
 
   async bulkIgnore(issues: NoteIssue[]): Promise<void> {
-    const set = new Set(this.settings.ignoredIssueKeys);
-    for (const issue of issues) set.add(issue.id);
-    this.settings.ignoredIssueKeys = [...set];
+    for (const issue of issues) this.ignoredSet.add(issue.id);
+    this.settings.ignoredIssueKeys = [...this.ignoredSet];
     await this.saveSettings();
     this.refreshViews();
     new Notice(`${PRODUCT_NAME}: ignored ${issues.length} result(s).`);
   }
 
   async bulkMarkReviewed(issues: NoteIssue[]): Promise<void> {
-    const set = new Set(this.settings.reviewedIssueKeys);
-    for (const issue of issues) set.add(issue.id);
-    this.settings.reviewedIssueKeys = [...set];
+    for (const issue of issues) this.reviewedSet.add(issue.id);
+    this.settings.reviewedIssueKeys = [...this.reviewedSet];
     await this.saveSettings();
     this.refreshViews();
     new Notice(`${PRODUCT_NAME}: marked ${issues.length} result(s) reviewed.`);
   }
 
+  /**
+   * Add a frontmatter property to notes that don't already have it. Existing
+   * values are never overwritten — a cleanup tool must not clobber user data.
+   * Returns how many were set vs. skipped.
+   */
   async bulkAddProperty(paths: string[], key: string, value: string): Promise<void> {
-    let count = 0;
+    let set = 0;
+    let skipped = 0;
     for (const path of unique(paths)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) continue;
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
-        fm[key] = value;
+        if (hasProperty(fm, key)) {
+          skipped++;
+        } else {
+          fm[key] = value;
+          set++;
+        }
       });
-      count++;
     }
-    new Notice(`${PRODUCT_NAME}: set "${key}" on ${count} note(s).`);
+    const tail = skipped > 0 ? ` (${skipped} already had it)` : "";
+    new Notice(`${PRODUCT_NAME}: set "${key}" on ${set} note(s)${tail}.`);
   }
 
   async bulkAddTag(paths: string[], tag: string): Promise<void> {
@@ -382,23 +506,55 @@ export default class NoteDoctorPlugin extends Plugin {
       issues: list,
     });
 
-    const folder = normalizePath(REPORT_FOLDER);
-    if (!this.app.vault.getAbstractFileByPath(folder)) {
-      await this.app.vault.createFolder(folder);
+    try {
+      const folder = normalizePath(REPORT_FOLDER);
+      if (!this.app.vault.getAbstractFileByPath(folder)) {
+        await this.app.vault.createFolder(folder);
+      }
+      const path = this.uniqueReportPath(folder);
+      const file = await this.app.vault.create(path, markdown);
+      await this.app.workspace.getLeaf(false).openFile(file);
+      new Notice(`${PRODUCT_NAME}: report exported.`);
+    } catch (err) {
+      console.error("Note Doctor: report export failed", err);
+      new Notice("Note Doctor: could not write the report. See the console for details.");
     }
-    const stamp = new Date(this.lastResult.scannedAt)
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[:T]/g, "-");
-    const path = normalizePath(`${folder}/Report ${stamp}.md`);
-    const file = await this.app.vault.create(path, markdown);
-    await this.app.workspace.getLeaf(false).openFile(file);
-    new Notice(`${PRODUCT_NAME}: report exported.`);
   }
 
-  /** Stable key for an issue (exposed for the review queue and bulk helpers). */
-  keyOf(issue: NoteIssue): string {
-    return issueKey(issue.notePath, issue.issueType, issue.sourceRuleId);
+  /** A collision-free report path, stamped at export time. */
+  private uniqueReportPath(folder: string): string {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    let path = normalizePath(`${folder}/Report ${stamp}.md`);
+    let n = 2;
+    while (this.app.vault.getAbstractFileByPath(path)) {
+      path = normalizePath(`${folder}/Report ${stamp} (${n}).md`);
+      n++;
+    }
+    return path;
+  }
+}
+
+/** Palette/dashboard picker for choosing which saved profile to run. */
+class ProfileSuggestModal extends FuzzySuggestModal<ScanProfile> {
+  constructor(
+    app: App,
+    private profiles: ScanProfile[],
+    private onChoose: (profile: ScanProfile) => void
+  ) {
+    super(app);
+    this.setPlaceholder("Run which scan profile?");
+  }
+
+  getItems(): ScanProfile[] {
+    return this.profiles;
+  }
+
+  getItemText(profile: ScanProfile): string {
+    return profile.name;
+  }
+
+  onChooseItem(profile: ScanProfile): void {
+    this.onChoose(profile);
   }
 }
 

@@ -148,7 +148,8 @@
 }
 
 .note-doctor-badge.is-stale { background: var(--color-orange); }
-.note-doctor-badge.is-thin { background: var(--color-yellow); color: var(--text-normal); }
+/* Yellow is too light for white text; pin dark text so it's legible in BOTH themes. */
+.note-doctor-badge.is-thin { background: var(--color-yellow); color: #1f1f1f; }
 .note-doctor-badge.is-orphan { background: var(--color-purple); }
 .note-doctor-badge.is-missing-properties { background: var(--color-red); }
 .note-doctor-badge.is-draft-marker { background: var(--color-blue); }
@@ -186,6 +187,128 @@
   flex-direction: column;
   gap: var(--size-2-2);
   align-items: flex-start;
+}
+
+/* Anchor styled as a button (external links routed by Obsidian). */
+.note-doctor-external-btn,
+a.note-doctor-cta-link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--size-2-2) var(--size-4-3);
+  border-radius: var(--radius-s);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-small);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.note-doctor-external-btn:hover,
+a.note-doctor-cta-link:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+  text-decoration: none;
+}
+
+/* First-run onboarding */
+
+.note-doctor-onboarding {
+  margin-top: var(--size-4-3);
+  padding: var(--size-4-4);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.note-doctor-onboarding h3 {
+  margin: 0 0 var(--size-2-2);
+}
+
+.note-doctor-onboarding-blurb {
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-3);
+  line-height: var(--line-height-normal);
+}
+
+/* Header stat + category tiles */
+
+.note-doctor-meta {
+  margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-stat {
+  display: flex;
+  align-items: baseline;
+  gap: var(--size-2-2);
+}
+
+.note-doctor-stat-num {
+  font-size: 2em;
+  font-weight: var(--font-bold);
+  line-height: 1;
+  color: var(--text-normal);
+}
+
+.note-doctor-stat-label {
+  color: var(--text-muted);
+}
+
+.note-doctor-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-2-2);
+  margin-top: var(--size-4-2);
+}
+
+.note-doctor-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 4.5em;
+  padding: var(--size-2-2) var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  cursor: pointer;
+}
+
+.note-doctor-tile:hover {
+  background: var(--background-modifier-hover);
+}
+
+.note-doctor-tile.is-active {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.note-doctor-tile-count {
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.note-doctor-tile-label {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Severity dot */
+
+.note-doctor-sev-dot {
+  flex-shrink: 0;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.note-doctor-sev-dot.is-high { background: var(--color-red); }
+.note-doctor-sev-dot.is-med { background: var(--color-orange); }
+.note-doctor-sev-dot.is-low { background: var(--text-faint); }
+
+.note-doctor-icon-btn.is-active {
+  color: var(--text-success);
 }
 
 /* Review queue modal */

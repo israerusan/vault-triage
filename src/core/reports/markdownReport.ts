@@ -52,7 +52,11 @@ export function buildMarkdownReport(input: ReportInput): string {
     lines.push(`## ${ISSUE_TYPE_LABELS[issueType]}`);
     for (const issue of group) {
       const link = `- [[${stripMdExtension(issue.noteName)}]]`;
-      lines.push(issue.details ? `${link} — ${issue.details}` : link);
+      // Fall back to the reason so every line carries the "why" the dashboard
+      // shows — not just the missing-properties detector, which is the only one
+      // that sets `details`.
+      const why = issue.details ?? issue.reason;
+      lines.push(why ? `${link} — ${why}` : link);
     }
     lines.push("");
   }

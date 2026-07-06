@@ -69,10 +69,14 @@ assert.ok(
   "stale section precedes thin section",
 );
 
-// Bullets: .md stripped from link text; details appended with an em dash.
+// Bullets: .md stripped from link text; details win, else the reason is the fallback
+// so every line carries the "why".
 assert.ok(reportLines.includes("- [[old]] — 120 days old"), "stale bullet with details");
-assert.ok(reportLines.includes("- [[old2]]"), "stale bullet without details");
-assert.ok(reportLines.includes("- [[thin]]"), "thin bullet");
+assert.ok(
+  reportLines.includes("- [[old2]] — not touched in a while"),
+  "detail-less bullet falls back to the reason",
+);
+assert.ok(reportLines.includes("- [[thin]] — too short"), "thin bullet carries its reason");
 assert.ok(!report.includes(".md]]"), "no .md extension in link text");
 
 // --- Without a profile name -------------------------------------------------

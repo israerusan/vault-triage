@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Notice, Setting } from "obsidian";
 import type NoteDoctorPlugin from "../main";
 import type { ScanProfile, IssueType, SortMode } from "../types";
 import { ISSUE_TYPES, ISSUE_TYPE_LABELS } from "../types";
@@ -30,7 +30,7 @@ export class ProfileEditModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
-    contentEl.createEl("h3", { text: this.existing ? "Edit profile" : "New profile" });
+    this.setTitle(this.existing ? "Edit profile" : "New profile");
 
     new Setting(contentEl).setName("Name").addText((t) =>
       t.setPlaceholder("Weekly Review").setValue(this.name).onChange((v) => (this.name = v))
@@ -79,10 +79,15 @@ export class ProfileEditModal extends Modal {
   }
 
   private async submit(): Promise<void> {
+    const enabledIssueTypes = ISSUE_TYPES.filter((t) => this.enabledTypes.has(t));
+    if (enabledIssueTypes.length === 0) {
+      new Notice("Select at least one issue type for this profile.");
+      return;
+    }
     const profile: ScanProfile = {
       id: this.existing?.id ?? newId("profile"),
       name: this.name.trim() || "Untitled profile",
-      enabledIssueTypes: ISSUE_TYPES.filter((t) => this.enabledTypes.has(t)),
+      enabledIssueTypes,
       includedFolders: parseList(this.includedFolders),
       excludedFolders: parseList(this.excludedFolders),
       sortMode: this.sortMode,

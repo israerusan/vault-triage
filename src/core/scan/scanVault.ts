@@ -1,8 +1,7 @@
-import { getAllTags, type App, type CachedMetadata } from "obsidian";
+import { getAllTags, type App, type CachedMetadata, type TFile } from "obsidian";
 import { ISSUE_TYPES } from "../../types";
 import type {
   NoteIssue,
-  RawNoteInput,
   ScanConfig,
   IssueType,
   NoteDoctorSettings,
@@ -24,28 +23,37 @@ export interface ScanResult {
   totalFiles: number;
 }
 
+/** Progress callback: how many candidate notes have been read so far, of total. */
+export type ScanProgress = (done: number, total: number) => void;
+
+/** Files are read in bounded-parallel batches to overlap I/O without flooding it. */
+const READ_BATCH = 64;
+
 /**
  * The single boundary that touches the Obsidian API. It gathers a plain
  * {@link RawNoteInput} per note, then runs the pure detectors and (Pro) custom
  * rules over them. `now` is injected so scans are deterministic in tests.
+ *
+ * Reads happen in batches (I/O overlapped) and yield between batches so the UI
+ * stays responsive and can report progress on large vaults.
  */
 export async function scanVault(
   app: App,
   config: ScanConfig,
   isPro: boolean,
-  now: number
+  now: number,
+  onProgress?: ScanProgress
 ): Promise<ScanResult> {
-  const files = app.vault.getMarkdownFiles();
   const inbound = buildInboundCounts(app);
-
   const enabled = new Set<IssueType>(config.enabledIssueTypes);
   const issues: NoteIssue[] = [];
-  let totalFiles = 0;
 
-  for (const file of files) {
+  // Pass 1 (synchronous): filter to the notes we'll actually scan, capturing the
+  // metadata cache we already have so pass 2 only does the async file reads.
+  const candidates: { file: TFile; tags: string[]; frontmatter: Record<string, unknown> }[] = [];
+  for (const file of app.vault.getMarkdownFiles()) {
     const cache = app.metadataCache.getFileCache(file);
     const tags = extractTags(cache);
-
     if (
       isExcluded(file.path, tags, {
         excludedFolders: config.excludedFolders,
@@ -56,56 +64,64 @@ export async function scanVault(
       continue;
     }
     if (!includedByFolders(file.path, config.includedFolders)) continue;
+    candidates.push({ file, tags, frontmatter: extractFrontmatter(cache) });
+  }
 
-    totalFiles++;
+  const totalFiles = candidates.length;
+  onProgress?.(0, totalFiles);
 
-    const content = await app.vault.cachedRead(file);
-    const raw: RawNoteInput = {
-      path: file.path,
-      name: file.basename,
-      mtime: file.stat.mtime,
-      content,
-      frontmatter: extractFrontmatter(cache),
-      tags,
-      inboundLinks: inbound.get(file.path) ?? 0,
-    };
-    const stat = buildNoteStat(raw);
+  // Pass 2: read + detect in bounded-parallel batches, yielding between them.
+  for (let i = 0; i < candidates.length; i += READ_BATCH) {
+    const batch = candidates.slice(i, i + READ_BATCH);
+    const contents = await Promise.all(batch.map((c) => app.vault.cachedRead(c.file)));
+    batch.forEach((c, j) => {
+      const stat = buildNoteStat({
+        path: c.file.path,
+        name: c.file.basename,
+        mtime: c.file.stat.mtime,
+        content: contents[j],
+        frontmatter: c.frontmatter,
+        tags: c.tags,
+        inboundLinks: inbound.get(c.file.path) ?? 0,
+      });
 
-    if (enabled.has("stale")) {
-      pushHit(issues, stat, "stale", config, staleDetector(stat, config.staleDaysThreshold, now));
-    }
-    if (enabled.has("thin")) {
-      pushHit(issues, stat, "thin", config, thinDetector(stat, config.minNoteLength));
-    }
-    if (enabled.has("orphan")) {
-      pushHit(issues, stat, "orphan", config, orphanDetector(stat));
-    }
-    if (enabled.has("missing-properties")) {
-      pushHit(
-        issues,
-        stat,
-        "missing-properties",
-        config,
-        missingPropertiesDetector(stat, config.requiredProperties)
-      );
-    }
-    if (enabled.has("draft-marker")) {
-      pushHit(issues, stat, "draft-marker", config, draftMarkerDetector(stat, config.draftMarkers));
-    }
-
-    if (isPro && enabled.has("custom") && config.customRules.length > 0) {
-      for (const hit of runCustomRules(stat, config.customRules, now)) {
-        issues.push({
-          id: issueKey(stat.path, "custom", hit.ruleId),
-          notePath: stat.path,
-          noteName: stat.name,
-          issueType: "custom",
-          severity: hit.severity,
-          reason: hit.reason,
-          sourceRuleId: hit.ruleId,
-        });
+      if (enabled.has("stale")) {
+        pushHit(issues, stat, "stale", config, staleDetector(stat, config.staleDaysThreshold, now));
       }
-    }
+      if (enabled.has("thin")) {
+        pushHit(issues, stat, "thin", config, thinDetector(stat, config.minNoteLength));
+      }
+      if (enabled.has("orphan")) {
+        pushHit(issues, stat, "orphan", config, orphanDetector(stat));
+      }
+      if (enabled.has("missing-properties")) {
+        pushHit(
+          issues,
+          stat,
+          "missing-properties",
+          config,
+          missingPropertiesDetector(stat, config.requiredProperties)
+        );
+      }
+      if (enabled.has("draft-marker")) {
+        pushHit(issues, stat, "draft-marker", config, draftMarkerDetector(stat, config.draftMarkers));
+      }
+
+      if (isPro && enabled.has("custom") && config.customRules.length > 0) {
+        for (const hit of runCustomRules(stat, config.customRules, now)) {
+          issues.push({
+            id: issueKey(stat.path, "custom", hit.ruleId),
+            notePath: stat.path,
+            noteName: stat.name,
+            issueType: "custom",
+            severity: hit.severity,
+            reason: hit.reason,
+            sourceRuleId: hit.ruleId,
+          });
+        }
+      }
+    });
+    onProgress?.(Math.min(i + READ_BATCH, totalFiles), totalFiles);
   }
 
   return { issues: sortIssues(issues, config.sortMode), totalFiles };
@@ -139,9 +155,10 @@ export function resolveScanConfig(
   const ruleIds = new Set(profile.customRuleIds ?? []);
   return {
     ...base,
-    enabledIssueTypes: profile.enabledIssueTypes.length
-      ? profile.enabledIssueTypes
-      : base.enabledIssueTypes,
+    // A profile's enabled types are honored exactly — including an empty set,
+    // which scans nothing (ProfileEditModal blocks saving zero types, so an empty
+    // set only arrives from hand-edited data). This is NOT a "fall back to all".
+    enabledIssueTypes: profile.enabledIssueTypes,
     staleDaysThreshold: profile.staleDaysThreshold ?? base.staleDaysThreshold,
     minNoteLength: profile.minNoteLength ?? base.minNoteLength,
     requiredProperties: profile.requiredProperties ?? base.requiredProperties,
@@ -183,6 +200,8 @@ function buildInboundCounts(app: App): Map<string, number> {
   for (const source of Object.keys(resolved)) {
     const targets = resolved[source];
     for (const target of Object.keys(targets)) {
+      // A note linking to itself doesn't make it non-orphan.
+      if (target === source) continue;
       counts.set(target, (counts.get(target) ?? 0) + targets[target]);
     }
   }

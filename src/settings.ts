@@ -203,29 +203,29 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .addButton((b) =>
-        b
-          .setButtonText("Validate")
-          .setCta()
-          .onClick(async () => {
-            const result = LicenseManager.verify(draft);
-            if (!result.valid) {
-              new Notice(result.error);
-              return;
-            }
-            s.licenseKey = draft;
-            this.plugin.refreshLicense();
-            await this.save();
-            new Notice(`${PRO_NAME} unlocked.`);
-            this.display();
-          })
-      )
-      .addButton((b) =>
-        b.setButtonText("Get Pro").onClick(() => {
-          window.open(PURCHASE_URL, "_blank");
+    const actions = new Setting(containerEl).addButton((b) =>
+      b
+        .setButtonText("Validate")
+        .setCta()
+        .onClick(async () => {
+          const result = LicenseManager.verify(draft);
+          if (!result.valid) {
+            new Notice(result.error);
+            return;
+          }
+          s.licenseKey = draft;
+          this.plugin.refreshLicense();
+          await this.save();
+          new Notice(`${PRO_NAME} unlocked.`);
+          this.display();
         })
-      );
+    );
+    // Anchor (not window.open) so Obsidian routes it to the OS on desktop and mobile.
+    actions.controlEl.createEl("a", {
+      text: "Get Pro",
+      cls: "note-doctor-external-btn",
+      href: PURCHASE_URL,
+    });
   }
 
   // --- Pro: severity tuning -------------------------------------------------
@@ -233,7 +233,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
   private renderSeveritySection(): void {
     const { containerEl } = this;
     const s = this.plugin.settings;
-    this.proHeading("Severity tuning", "severity");
+    this.proHeading("Severity tuning");
     if (!this.plugin.isPro) return;
 
     for (const type of ISSUE_TYPES) {
@@ -258,7 +258,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
   private renderRulesSection(): void {
     const { containerEl } = this;
     const s = this.plugin.settings;
-    this.proHeading("Custom rules", "rules");
+    this.proHeading("Custom rules");
     if (!this.plugin.isPro) return;
 
     for (const rule of s.customRules) {
@@ -308,7 +308,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
   private renderProfilesSection(): void {
     const { containerEl } = this;
     const s = this.plugin.settings;
-    this.proHeading("Saved scan profiles", "profiles");
+    this.proHeading("Saved scan profiles");
     if (!this.plugin.isPro) return;
 
     for (const profile of s.savedProfiles) {
@@ -354,21 +354,18 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
   }
 
   /** A section heading that shows a Pro pill and, for free users, an upsell row. */
-  private proHeading(title: string, feature: string): void {
+  private proHeading(title: string): void {
     const { containerEl } = this;
     const heading = new Setting(containerEl).setName(title).setHeading();
     heading.nameEl.createSpan({ text: "Pro", cls: "note-doctor-pro-pill" });
     if (!this.plugin.isPro) {
-      new Setting(containerEl)
-        .setDesc(PRO_TAGLINE)
-        .addButton((b) =>
-          b
-            .setButtonText("Unlock Pro")
-            .setCta()
-            .onClick(() => window.open(PURCHASE_URL, "_blank"))
-        )
-        .settingEl.addClass("note-doctor-locked");
-      void feature;
+      const upsell = new Setting(containerEl).setDesc(PRO_TAGLINE);
+      upsell.settingEl.addClass("note-doctor-locked");
+      upsell.controlEl.createEl("a", {
+        text: "Unlock Pro",
+        cls: "note-doctor-external-btn",
+        href: PURCHASE_URL,
+      });
     }
   }
 }

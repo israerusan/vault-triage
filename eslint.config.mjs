@@ -45,9 +45,6 @@ export default tseslint.config(
 			// Advises the declarative settings API added in Obsidian 1.13.0; this plugin
 			// targets minAppVersion 1.4.0 and uses the classic display() settings tab.
 			"obsidianmd/settings-tab/prefer-setting-definitions": "off",
-			// Some views build small SVG bars/icons via createElementNS, which
-			// createDiv/createEl can't express (they only make HTML elements).
-			"obsidianmd/prefer-create-el": "off",
 		},
 	}
 );
