@@ -95,6 +95,11 @@ export class ReviewQueueModal extends Modal {
     // Pro: fix the note without leaving the queue.
     this.actionButton(actions, "wand-2", "Add a property (p) — Pro", () => this.quickAddProperty());
 
+    contentEl.createDiv({
+      cls: "note-doctor-review-legend",
+      text: "← → navigate · r review · i ignore · e exclude · o open · p add property",
+    });
+
     const nav = contentEl.createDiv({ cls: "note-doctor-review-nav" });
     const prev = nav.createEl("button", { text: "Previous" });
     prev.disabled = this.index === 0;

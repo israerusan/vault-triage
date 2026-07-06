@@ -25,6 +25,12 @@ export class NoteDoctorView extends ItemView {
   private summaryEl: HTMLElement | null = null;
   private progressEl: HTMLElement | null = null;
   private selCountEl: HTMLElement | null = null;
+  /** So a fresh scan adopts its profile's sort once, without fighting user changes. */
+  private lastSyncedScanAt: string | null = null;
+
+  async onClose(): Promise<void> {
+    this.contentEl.empty();
+  }
 
   constructor(leaf: WorkspaceLeaf, private plugin: NoteDoctorPlugin) {
     super(leaf);
@@ -83,6 +89,13 @@ export class NoteDoctorView extends ItemView {
       }
       if (!this.plugin.isPro) this.renderProCta(root);
       return;
+    }
+
+    const last = this.plugin.lastResult;
+    // A newly-completed scan adopts its (profile's) sort mode once.
+    if (last && last.scannedAt !== this.lastSyncedScanAt) {
+      this.sortMode = last.sortMode;
+      this.lastSyncedScanAt = last.scannedAt;
     }
 
     const issues = this.plugin.visibleIssues();
@@ -194,15 +207,20 @@ export class NoteDoctorView extends ItemView {
     if (!host) return;
     host.empty();
 
-    // The hero counts affected NOTES, not raw issues (one note can trip several).
-    const affected = new Set(issues.map((i) => i.notePath)).size;
+    // Hero counts affected NOTES that still have UN-reviewed issues, so the
+    // number visibly falls as the user works through the review loop.
+    const outstanding = issues.filter((i) => !this.plugin.isReviewed(i));
+    const affected = new Set(outstanding.map((i) => i.notePath)).size;
+    const reviewedCount = issues.length - outstanding.length;
     const stat = host.createDiv({ cls: "note-doctor-stat" });
     stat.createSpan({ cls: "note-doctor-stat-num", text: String(affected) });
     stat.createSpan({
       cls: "note-doctor-stat-label",
       text:
         affected === 0
-          ? "your vault is clean"
+          ? issues.length === 0
+            ? "your vault is clean"
+            : "all reviewed — nicely done"
           : affected === 1
             ? "note needs attention"
             : "notes need attention",
@@ -212,17 +230,21 @@ export class NoteDoctorView extends ItemView {
     const last = this.plugin.lastResult;
     if (last) {
       const issueWord = issues.length === 1 ? "issue" : "issues";
+      const reviewed = reviewedCount > 0 ? ` · ${reviewedCount} reviewed` : "";
       this.summaryEl.setText(
-        `${issues.length} ${issueWord} · scanned ${relativeTime(last.scannedAt)} · ${last.totalFiles} notes`
+        `${issues.length} ${issueWord}${reviewed} · scanned ${relativeTime(last.scannedAt)}`
       );
     }
 
     this.renderTiles(host, issues);
 
     if (issues.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
-      host.createDiv({
-        cls: "note-doctor-nudge",
-        text: "Tip: add fields under Required properties in settings to also catch missing metadata.",
+      const nudge = host.createDiv({ cls: "note-doctor-nudge" });
+      nudge.appendText("Also catch notes missing metadata? ");
+      const link = nudge.createEl("a", { cls: "note-doctor-inline-link", text: "Check for a required property" });
+      link.addEventListener("click", () => {
+        this.plugin.settings.requiredProperties = ["tags"];
+        void this.plugin.saveSettings().then(() => this.plugin.runScan(this.plugin.lastResult?.profileId));
       });
     }
   }
@@ -333,9 +355,10 @@ export class NoteDoctorView extends ItemView {
         ],
         (v) => {
           if (v.key.trim()) {
+            const paths = selectedIssues().map((i) => i.notePath);
             void this.plugin
-              .bulkAddProperty(selectedIssues().map((i) => i.notePath), v.key.trim(), v.value)
-              .then(() => this.afterBulk());
+              .bulkAddProperty(paths, v.key.trim(), v.value)
+              .then(() => this.afterBulkMutate());
           }
         }
       ).open();
@@ -347,9 +370,8 @@ export class NoteDoctorView extends ItemView {
         [{ key: "tag", label: "Tag", placeholder: "review" }],
         (v) => {
           if (v.tag.trim()) {
-            void this.plugin
-              .bulkAddTag(selectedIssues().map((i) => i.notePath), v.tag.trim())
-              .then(() => this.afterBulk());
+            const paths = selectedIssues().map((i) => i.notePath);
+            void this.plugin.bulkAddTag(paths, v.tag.trim()).then(() => this.afterBulkMutate());
           }
         }
       ).open();
@@ -365,6 +387,13 @@ export class NoteDoctorView extends ItemView {
   private afterBulk(): void {
     this.selected.clear();
     this.render();
+  }
+
+  /** After a file-mutating bulk action, re-scan so the fixed notes drop off. */
+  private afterBulkMutate(): void {
+    this.selected.clear();
+    this.bulkMode = false;
+    void this.plugin.runScan(this.plugin.lastResult?.profileId);
   }
 
   private renderProCta(root: HTMLElement): void {

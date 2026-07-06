@@ -42,6 +42,8 @@ export class ProUpsellModal extends Modal {
   }
 
   private openLicenseSettings(): void {
+    // No public API opens a specific settings tab; feature-detected + optional so
+    // it degrades to a no-op if the internal shape ever changes.
     const setting = (this.app as unknown as { setting?: SettingApi }).setting;
     setting?.open();
     setting?.openTabById("note-doctor");

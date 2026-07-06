@@ -29,8 +29,9 @@ const INITIAL_ROWS = 200;
 /**
  * Render an already-sorted list of issues. Each row opens its note and exposes
  * mark-reviewed / ignore inline, with reveal + exclude in an overflow menu.
- * Rows are windowed (large lists load in chunks) and toggling reviewed/ignore/
- * exclude updates only the affected rows — the whole view is never rebuilt.
+ * Rows load incrementally (large lists paginate on demand via "show more") and
+ * toggling reviewed/ignore/exclude updates only the affected rows — the whole
+ * view is never rebuilt.
  */
 export function renderResultsList(
   container: HTMLElement,
@@ -91,9 +92,10 @@ function renderRow(
     });
   }
 
+  // Severity as a letter tier (H/M/L), not color alone — colorblind-safe.
   const tier = severityTier(issue.severity);
-  const dot = row.createSpan({ cls: `note-doctor-sev-dot ${tier.cls}` });
-  dot.setAttribute("aria-label", `${tier.label} severity`);
+  const tierEl = row.createSpan({ cls: `note-doctor-sev ${tier.cls}`, text: tier.label[0] });
+  tierEl.setAttribute("aria-label", `${tier.label} severity`);
 
   row.createSpan({
     cls: `note-doctor-badge is-${issue.issueType}`,
@@ -102,8 +104,16 @@ function renderRow(
 
   const main = row.createDiv({ cls: "note-doctor-row-main" });
   const title = main.createEl("button", { cls: "note-doctor-row-title", text: issue.noteName });
+  // Full path as the accessible name (Obsidian shows it on hover) so long or
+  // duplicate basenames are readable and disambiguated.
+  title.setAttribute("aria-label", issue.notePath);
   title.addEventListener("click", () => void plugin.openNote(issue.notePath));
-  main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
+  const slash = issue.notePath.lastIndexOf("/");
+  if (slash > 0) {
+    main.createDiv({ cls: "note-doctor-row-folder", text: issue.notePath.slice(0, slash) });
+  }
+  const reasonEl = main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
+  reasonEl.setAttribute("aria-label", issue.reason);
 
   // The title already opens the note; the action strip focuses on triage.
   const actions = row.createDiv({ cls: "note-doctor-row-actions" });

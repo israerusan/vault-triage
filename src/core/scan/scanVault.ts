@@ -1,5 +1,6 @@
 import { getAllTags, type App, type CachedMetadata, type TFile } from "obsidian";
 import { ISSUE_TYPES } from "../../types";
+import { REPORT_FOLDER } from "../../product";
 import type {
   NoteIssue,
   ScanConfig,
@@ -52,6 +53,8 @@ export async function scanVault(
   // metadata cache we already have so pass 2 only does the async file reads.
   const candidates: { file: TFile; tags: string[]; frontmatter: Record<string, unknown> }[] = [];
   for (const file of app.vault.getMarkdownFiles()) {
+    // Never scan our own exported reports (they'd self-flag as draft/stale).
+    if (file.path === REPORT_FOLDER || file.path.startsWith(REPORT_FOLDER + "/")) continue;
     const cache = app.metadataCache.getFileCache(file);
     const tags = extractTags(cache);
     if (
@@ -69,6 +72,9 @@ export async function scanVault(
 
   const totalFiles = candidates.length;
   onProgress?.(0, totalFiles);
+
+  const yielder = makeYielder();
+  let lastYield = performance.now();
 
   // Pass 2: read + detect in bounded-parallel batches, yielding between them.
   for (let i = 0; i < candidates.length; i += READ_BATCH) {
@@ -123,13 +129,33 @@ export async function scanVault(
       }
     });
     onProgress?.(Math.min(i + READ_BATCH, totalFiles), totalFiles);
-    // Yield a real macrotask so the UI can paint the progress bar and stay
-    // responsive — cachedRead resolves on the microtask queue for unchanged
-    // files (warm re-scans), which would otherwise never let the loop breathe.
-    await new Promise<void>((resolve) => window.setTimeout(resolve));
+    // Yield only when we've held the main thread a frame's worth, so the UI can
+    // paint/stay responsive — but warm rescans (cachedRead resolves on the
+    // microtask queue) don't pay a fixed per-batch tax. A MessageChannel yield
+    // isn't subject to the nested-setTimeout 4ms clamp.
+    if (performance.now() - lastYield > 16) {
+      await yielder();
+      lastYield = performance.now();
+    }
   }
 
   return { issues: sortIssues(issues, config.sortMode), totalFiles };
+}
+
+/** A reusable macrotask yield via MessageChannel (no 4ms setTimeout clamp). */
+function makeYielder(): () => Promise<void> {
+  const channel = new MessageChannel();
+  let resolveCurrent: (() => void) | null = null;
+  channel.port1.onmessage = () => {
+    const r = resolveCurrent;
+    resolveCurrent = null;
+    if (r) r();
+  };
+  return () =>
+    new Promise<void>((resolve) => {
+      resolveCurrent = resolve;
+      channel.port2.postMessage(0);
+    });
 }
 
 /**

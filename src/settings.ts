@@ -12,7 +12,9 @@ export const DEFAULT_SETTINGS: NoteDoctorSettings = {
   staleDaysThreshold: 90,
   minNoteLength: 150,
   requiredProperties: [],
-  draftMarkers: ["TODO", "FIXME", "draft", "incomplete"],
+  // Deliberate tokens only — bare words like "draft"/"incomplete" match ordinary
+  // prose ("the draft budget") and flood the first scan with false positives.
+  draftMarkers: ["TODO", "FIXME", "WIP"],
   excludedFolders: [],
   excludedPaths: [],
   excludedTags: [],
@@ -113,7 +115,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
       .setDesc("Comma-separated words that mark an unfinished note.")
       .addText((t) =>
         t
-          .setPlaceholder("TODO, FIXME, draft, incomplete")
+          .setPlaceholder("TODO, FIXME, WIP")
           .setValue(s.draftMarkers.join(", "))
           .onChange(async (v) => {
             s.draftMarkers = parseList(v);
@@ -193,7 +195,10 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
     let draft = s.licenseKey;
     new Setting(containerEl)
       .setName("License key")
-      .setDesc(this.plugin.licenseError ?? "Paste your Pro license key to unlock all Pro features.")
+      .setDesc(
+        this.plugin.licenseError ??
+          "After purchase your key arrives by email. Paste it here to unlock all Pro features."
+      )
       .addText((t) =>
         t
           .setPlaceholder("payload.signature")

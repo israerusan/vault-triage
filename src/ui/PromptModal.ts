@@ -26,24 +26,33 @@ export class PromptModal extends Modal {
     const { contentEl } = this;
     this.titleEl.setText(this.title);
 
+    const submit = (): void => {
+      this.close();
+      this.onSubmit(this.values);
+    };
+
+    const inputs: HTMLInputElement[] = [];
     for (const field of this.fields) {
       this.values[field.key] = "";
-      new Setting(contentEl).setName(field.label).addText((t) =>
+      new Setting(contentEl).setName(field.label).addText((t) => {
         t.setPlaceholder(field.placeholder ?? "").onChange((v) => {
           this.values[field.key] = v;
-        })
-      );
+        });
+        inputs.push(t.inputEl);
+        // Enter (without Shift) submits from any field.
+        t.inputEl.addEventListener("keydown", (evt: KeyboardEvent) => {
+          if (evt.key === "Enter" && !evt.shiftKey) {
+            evt.preventDefault();
+            submit();
+          }
+        });
+      });
     }
 
-    new Setting(contentEl).addButton((b) =>
-      b
-        .setButtonText("Apply")
-        .setCta()
-        .onClick(() => {
-          this.close();
-          this.onSubmit(this.values);
-        })
-    );
+    new Setting(contentEl).addButton((b) => b.setButtonText("Apply").setCta().onClick(submit));
+
+    // Focus the first field so the flow is type-and-Enter.
+    if (inputs.length > 0) inputs[0].focus();
   }
 
   onClose(): void {

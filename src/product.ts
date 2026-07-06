@@ -4,6 +4,9 @@
 /** Signed into every license payload; a key only unlocks the product it names. */
 export const PRODUCT_ID = "note-doctor";
 
+/** Plugin-owned folder for exported reports; always skipped by scans. */
+export const REPORT_FOLDER = "Note Doctor Reports";
+
 export const PRODUCT_NAME = "Note Doctor";
 export const PRO_NAME = "Note Doctor Pro";
 
@@ -23,6 +26,6 @@ export const PRO_UPSELL: Record<string, string> = {
   rules: "Custom rules are a Pro feature. " + PRO_TAGLINE,
   bulk: "Bulk actions are a Pro feature. " + PRO_TAGLINE,
   export: "Report export is a Pro feature. " + PRO_TAGLINE,
-  review: "Fixing notes without leaving the review queue is a Pro feature. " + PRO_TAGLINE,
+  review: "Editing frontmatter without leaving the review queue is a Pro feature. " + PRO_TAGLINE,
   severity: "Severity tuning is a Pro feature. " + PRO_TAGLINE,
 };

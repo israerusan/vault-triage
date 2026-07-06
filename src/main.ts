@@ -7,7 +7,7 @@ import {
   WorkspaceLeaf,
   normalizePath,
 } from "obsidian";
-import type { NoteDoctorSettings, NoteIssue, CustomRule, ScanProfile } from "./types";
+import type { NoteDoctorSettings, NoteIssue, CustomRule, ScanProfile, SortMode } from "./types";
 import { DEFAULT_SETTINGS, NoteDoctorSettingTab } from "./settings";
 import { NoteDoctorView, VIEW_TYPE_NOTE_DOCTOR } from "./ui/DashboardView";
 import { ReviewQueueModal } from "./ui/ReviewQueueModal";
@@ -18,7 +18,7 @@ import { issueKey, issueKeyPath } from "./core/utils/ids";
 import { isMeaningful } from "./core/utils/frontmatter";
 import { LicenseManager } from "./core/license/LicenseManager";
 import { requirePro } from "./ui/pro/ProGate";
-import { PRODUCT_NAME } from "./product";
+import { PRODUCT_NAME, REPORT_FOLDER } from "./product";
 
 /** Obsidian's internal command runner — not in the public typings. */
 interface CommandsApi {
@@ -32,9 +32,8 @@ export interface ScanRun {
   totalFiles: number;
   scannedAt: string;
   profileId?: string;
+  sortMode: SortMode;
 }
-
-const REPORT_FOLDER = "Note Doctor Reports";
 
 export default class NoteDoctorPlugin extends Plugin {
   settings: NoteDoctorSettings = structuredClone(DEFAULT_SETTINGS);
@@ -144,14 +143,22 @@ export default class NoteDoctorPlugin extends Plugin {
       window.clearTimeout(this.saveTimer);
       this.saveTimer = null;
     }
+    this.materializeKeys();
     await this.saveData(this.settings);
   }
 
-  /** Coalesce a burst of toggles into one write (in-memory state is already current). */
+  /** The Sets are canonical; write them into the persisted arrays only at save time. */
+  private materializeKeys(): void {
+    this.settings.ignoredIssueKeys = [...this.ignoredSet];
+    this.settings.reviewedIssueKeys = [...this.reviewedSet];
+  }
+
+  /** Coalesce a burst of toggles into one write (the Sets are already current). */
   private scheduleSave(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
       this.saveTimer = null;
+      this.materializeKeys();
       void this.saveData(this.settings);
     }, 400);
   }
@@ -161,6 +168,7 @@ export default class NoteDoctorPlugin extends Plugin {
     if (this.saveTimer === null) return;
     window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
+    this.materializeKeys();
     void this.saveData(this.settings);
   }
 
@@ -176,9 +184,8 @@ export default class NoteDoctorPlugin extends Plugin {
   /** Keep only ignore/reviewed keys for issues present in the given (full) scan. */
   private pruneKeys(issues: NoteIssue[]): void {
     const live = new Set(issues.map((i) => i.id));
-    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.filter((k) => live.has(k));
-    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.filter((k) => live.has(k));
-    this.rebuildKeySets();
+    for (const k of [...this.ignoredSet]) if (!live.has(k)) this.ignoredSet.delete(k);
+    for (const k of [...this.reviewedSet]) if (!live.has(k)) this.reviewedSet.delete(k);
   }
 
   /** Re-verify the stored license key and update the Pro entitlement flags. */
@@ -254,7 +261,7 @@ export default class NoteDoctorPlugin extends Plugin {
       );
       const scannedAt = new Date(now).toISOString();
 
-      this.lastResult = { issues, totalFiles, scannedAt, profileId };
+      this.lastResult = { issues, totalFiles, scannedAt, profileId, sortMode: config.sortMode };
       this.settings.lastScanSummary = {
         scannedAt,
         totalFiles,
@@ -300,24 +307,18 @@ export default class NoteDoctorPlugin extends Plugin {
 
   /** Persist an ignore/reviewed toggle (debounced). Callers update UI in place. */
   async setIgnored(issue: NoteIssue, ignored: boolean): Promise<void> {
-    this.applyKey(this.ignoredSet, "ignoredIssueKeys", issue.id, ignored);
+    this.applyKey(this.ignoredSet, issue.id, ignored);
     this.scheduleSave();
   }
 
   async setReviewed(issue: NoteIssue, reviewed: boolean): Promise<void> {
-    this.applyKey(this.reviewedSet, "reviewedIssueKeys", issue.id, reviewed);
+    this.applyKey(this.reviewedSet, issue.id, reviewed);
     this.scheduleSave();
   }
 
-  private applyKey(
-    set: Set<string>,
-    field: "ignoredIssueKeys" | "reviewedIssueKeys",
-    key: string,
-    on: boolean
-  ): void {
+  private applyKey(set: Set<string>, key: string, on: boolean): void {
     if (on) set.add(key);
     else set.delete(key);
-    this.settings[field] = [...set];
   }
 
   /** Exclude a note's path from all future scans. Caller refreshes its own UI. */
@@ -334,32 +335,35 @@ export default class NoteDoctorPlugin extends Plugin {
 
   /** Rewrite stored keys/paths when a note (or folder) is renamed or moved. */
   private migratePath(oldPath: string, newPath: string): boolean {
+    const remap = (p: string): string =>
+      p === oldPath ? newPath : p.startsWith(oldPath + "/") ? newPath + p.slice(oldPath.length) : p;
     const remapKey = (key: string): string => {
       const p = issueKeyPath(key);
-      const rest = key.slice(p.length); // separator + type (+ ruleId)
-      if (p === oldPath) return newPath + rest;
-      if (p.startsWith(oldPath + "/")) return newPath + p.slice(oldPath.length) + rest;
-      return key;
+      return remap(p) + key.slice(p.length); // path + (separator + type [+ ruleId])
     };
-    const remapPath = (p: string): string =>
-      p === oldPath ? newPath : p.startsWith(oldPath + "/") ? newPath + p.slice(oldPath.length) : p;
+    const remapSet = (set: Set<string>): boolean => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of set) {
+        const nk = remapKey(k);
+        if (nk !== k) changed = true;
+        next.add(nk);
+      }
+      if (changed) {
+        set.clear();
+        for (const k of next) set.add(k);
+      }
+      return changed;
+    };
 
-    const before = JSON.stringify([
-      this.settings.ignoredIssueKeys,
-      this.settings.reviewedIssueKeys,
-      this.settings.excludedPaths,
-    ]);
-    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.map(remapKey);
-    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.map(remapKey);
-    this.settings.excludedPaths = this.settings.excludedPaths.map(remapPath);
-    this.rebuildKeySets();
-    return (
-      JSON.stringify([
-        this.settings.ignoredIssueKeys,
-        this.settings.reviewedIssueKeys,
-        this.settings.excludedPaths,
-      ]) !== before
-    );
+    let changed = remapSet(this.ignoredSet);
+    changed = remapSet(this.reviewedSet) || changed;
+    const nextEx = this.settings.excludedPaths.map(remap);
+    if (nextEx.some((p, i) => p !== this.settings.excludedPaths[i])) {
+      this.settings.excludedPaths = nextEx;
+      changed = true;
+    }
+    return changed;
   }
 
   /** Rewrite in-memory scan results when a note (or folder) is renamed/moved. */
@@ -383,30 +387,29 @@ export default class NoteDoctorPlugin extends Plugin {
     return changed;
   }
 
-  /** Drop in-memory results for a deleted note. */
+  /** Drop in-memory results for a deleted note or folder subtree. */
   private dropLastResult(path: string): boolean {
     if (!this.lastResult) return false;
     const before = this.lastResult.issues.length;
-    this.lastResult.issues = this.lastResult.issues.filter((i) => i.notePath !== path);
+    this.lastResult.issues = this.lastResult.issues.filter(
+      (i) => i.notePath !== path && !i.notePath.startsWith(path + "/")
+    );
     return this.lastResult.issues.length !== before;
   }
 
-  /** Drop stored keys/paths for a deleted note so data.json doesn't accrete cruft. */
+  /** Drop stored keys/paths for a deleted note or folder subtree. */
   private dropPath(path: string): boolean {
-    const keepKey = (key: string): boolean => issueKeyPath(key) !== path;
-    const beforeLen =
-      this.settings.ignoredIssueKeys.length +
-      this.settings.reviewedIssueKeys.length +
-      this.settings.excludedPaths.length;
-    this.settings.ignoredIssueKeys = this.settings.ignoredIssueKeys.filter(keepKey);
-    this.settings.reviewedIssueKeys = this.settings.reviewedIssueKeys.filter(keepKey);
-    this.settings.excludedPaths = this.settings.excludedPaths.filter((p) => p !== path);
-    this.rebuildKeySets();
-    const afterLen =
-      this.settings.ignoredIssueKeys.length +
-      this.settings.reviewedIssueKeys.length +
-      this.settings.excludedPaths.length;
-    return afterLen !== beforeLen;
+    // A folder delete fires ONE event for the folder, so match the subtree too.
+    const affected = (p: string): boolean => p === path || p.startsWith(path + "/");
+    let changed = false;
+    for (const k of [...this.ignoredSet]) if (affected(issueKeyPath(k))) { this.ignoredSet.delete(k); changed = true; }
+    for (const k of [...this.reviewedSet]) if (affected(issueKeyPath(k))) { this.reviewedSet.delete(k); changed = true; }
+    const nextEx = this.settings.excludedPaths.filter((p) => !affected(p));
+    if (nextEx.length !== this.settings.excludedPaths.length) {
+      this.settings.excludedPaths = nextEx;
+      changed = true;
+    }
+    return changed;
   }
 
   // --- Navigation -----------------------------------------------------------
@@ -498,7 +501,6 @@ export default class NoteDoctorPlugin extends Plugin {
 
   async bulkIgnore(issues: NoteIssue[]): Promise<void> {
     for (const issue of issues) this.ignoredSet.add(issue.id);
-    this.settings.ignoredIssueKeys = [...this.ignoredSet];
     await this.saveSettings();
     this.refreshViews();
     new Notice(`${PRODUCT_NAME}: ignored ${issues.length} result(s).`);
@@ -506,7 +508,6 @@ export default class NoteDoctorPlugin extends Plugin {
 
   async bulkMarkReviewed(issues: NoteIssue[]): Promise<void> {
     for (const issue of issues) this.reviewedSet.add(issue.id);
-    this.settings.reviewedIssueKeys = [...this.reviewedSet];
     await this.saveSettings();
     this.refreshViews();
     new Notice(`${PRODUCT_NAME}: marked ${issues.length} result(s) reviewed.`);

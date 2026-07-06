@@ -6,13 +6,19 @@ import { newId } from "../core/utils/ids";
 import { parseList } from "../settings";
 
 /** Create or edit a saved scan profile (Pro): a reusable set of enabled issue
- *  types, folder scope, and threshold overrides. */
+ *  types, folder scope, threshold overrides, and which custom rules run. */
 export class ProfileEditModal extends Modal {
   private name: string;
   private enabledTypes: Set<IssueType>;
   private includedFolders: string;
   private excludedFolders: string;
   private sortMode: SortMode;
+  private staleDays: string;
+  private minLength: string;
+  private requiredProps: string;
+  private draftMarkers: string;
+  /** Custom-rule ids this profile runs; undefined means "all rules". */
+  private ruleIds: Set<string> | null;
 
   constructor(
     app: App,
@@ -26,6 +32,11 @@ export class ProfileEditModal extends Modal {
     this.includedFolders = (existing?.includedFolders ?? []).join(", ");
     this.excludedFolders = (existing?.excludedFolders ?? []).join(", ");
     this.sortMode = existing?.sortMode ?? "severity";
+    this.staleDays = existing?.staleDaysThreshold != null ? String(existing.staleDaysThreshold) : "";
+    this.minLength = existing?.minNoteLength != null ? String(existing.minNoteLength) : "";
+    this.requiredProps = (existing?.requiredProperties ?? []).join(", ");
+    this.draftMarkers = (existing?.draftMarkers ?? []).join(", ");
+    this.ruleIds = existing?.customRuleIds ? new Set(existing.customRuleIds) : null;
   }
 
   onOpen(): void {
@@ -49,15 +60,47 @@ export class ProfileEditModal extends Modal {
     new Setting(contentEl)
       .setName("Included folders")
       .setDesc("Comma-separated. Leave blank to scan the whole vault.")
-      .addText((t) =>
-        t.setValue(this.includedFolders).onChange((v) => (this.includedFolders = v))
-      );
+      .addText((t) => t.setValue(this.includedFolders).onChange((v) => (this.includedFolders = v)));
     new Setting(contentEl)
       .setName("Excluded folders")
       .setDesc("Comma-separated. Overrides the global exclusions when set.")
-      .addText((t) =>
-        t.setValue(this.excludedFolders).onChange((v) => (this.excludedFolders = v))
-      );
+      .addText((t) => t.setValue(this.excludedFolders).onChange((v) => (this.excludedFolders = v)));
+
+    contentEl.createEl("p", {
+      text: "Threshold overrides (blank = use global)",
+      cls: "note-doctor-modal-label",
+    });
+    new Setting(contentEl).setName("Stale after (days)").addText((t) =>
+      t.setPlaceholder("global").setValue(this.staleDays).onChange((v) => (this.staleDays = v))
+    );
+    new Setting(contentEl).setName("Minimum note length").addText((t) =>
+      t.setPlaceholder("global").setValue(this.minLength).onChange((v) => (this.minLength = v))
+    );
+    new Setting(contentEl)
+      .setName("Required properties")
+      .setDesc("Comma-separated. Blank = use global.")
+      .addText((t) => t.setValue(this.requiredProps).onChange((v) => (this.requiredProps = v)));
+    new Setting(contentEl)
+      .setName("Draft markers")
+      .setDesc("Comma-separated. Blank = use global.")
+      .addText((t) => t.setValue(this.draftMarkers).onChange((v) => (this.draftMarkers = v)));
+
+    const rules = this.plugin.settings.customRules;
+    if (rules.length > 0) {
+      contentEl.createEl("p", {
+        text: "Custom rules to run (none selected = all)",
+        cls: "note-doctor-modal-label",
+      });
+      for (const rule of rules) {
+        new Setting(contentEl).setName(rule.name || "Untitled rule").addToggle((t) =>
+          t.setValue(this.ruleIds ? this.ruleIds.has(rule.id) : true).onChange((v) => {
+            if (!this.ruleIds) this.ruleIds = new Set(rules.map((r) => r.id));
+            if (v) this.ruleIds.add(rule.id);
+            else this.ruleIds.delete(rule.id);
+          })
+        );
+      }
+    }
 
     new Setting(contentEl).setName("Sort").addDropdown((d) => {
       d.addOption("severity", "Severity");
@@ -67,10 +110,7 @@ export class ProfileEditModal extends Modal {
     });
 
     new Setting(contentEl).addButton((b) =>
-      b
-        .setButtonText("Save profile")
-        .setCta()
-        .onClick(() => void this.submit())
+      b.setButtonText("Save profile").setCta().onClick(() => void this.submit())
     );
   }
 
@@ -84,9 +124,12 @@ export class ProfileEditModal extends Modal {
       new Notice("Select at least one issue type for this profile.");
       return;
     }
+    const staleDaysThreshold = toInt(this.staleDays);
+    const minNoteLength = toInt(this.minLength);
+    const requiredProperties = parseList(this.requiredProps);
+    const draftMarkers = parseList(this.draftMarkers);
+
     const profile: ScanProfile = {
-      // Preserve any override fields the modal doesn't surface (thresholds,
-      // custom-rule scoping) so editing a profile never silently drops them.
       ...this.existing,
       id: this.existing?.id ?? newId("profile"),
       name: this.name.trim() || "Untitled profile",
@@ -94,8 +137,21 @@ export class ProfileEditModal extends Modal {
       includedFolders: parseList(this.includedFolders),
       excludedFolders: parseList(this.excludedFolders),
       sortMode: this.sortMode,
+      staleDaysThreshold,
+      minNoteLength,
+      requiredProperties: requiredProperties.length > 0 ? requiredProperties : undefined,
+      draftMarkers: draftMarkers.length > 0 ? draftMarkers : undefined,
+      customRuleIds: this.ruleIds ? [...this.ruleIds] : undefined,
     };
     await this.onSave(profile);
     this.close();
   }
+}
+
+/** Parse an optional integer override; blank/invalid yields undefined (use global). */
+function toInt(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const n = Number.parseInt(trimmed, 10);
+  return Number.isNaN(n) ? undefined : n;
 }

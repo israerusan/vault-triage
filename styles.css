@@ -381,19 +381,44 @@ button.note-doctor-tile:hover {
   white-space: nowrap;
 }
 
-/* Severity dot */
+/* Severity tier chip (letter + color, so it's legible without relying on hue) */
 
-.note-doctor-sev-dot {
+.note-doctor-sev {
   flex-shrink: 0;
-  width: 0.6em;
-  height: 0.6em;
-  border-radius: 50%;
-  background: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-bold);
+  color: #fff;
 }
 
-.note-doctor-sev-dot.is-high { background: var(--color-red); }
-.note-doctor-sev-dot.is-med { background: var(--color-orange); }
-.note-doctor-sev-dot.is-low { background: var(--text-faint); }
+.note-doctor-sev.is-high { background: var(--color-red); }
+.note-doctor-sev.is-med { background: var(--color-orange); }
+.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-muted); }
+
+.note-doctor-row-folder {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-doctor-review-legend {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  margin: var(--size-4-2) 0;
+}
+
+.note-doctor-inline-link {
+  cursor: pointer;
+  color: var(--text-accent);
+  text-decoration: underline;
+}
 
 .note-doctor-icon-btn.is-active {
   color: var(--text-success);
