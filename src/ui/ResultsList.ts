@@ -1,7 +1,16 @@
 import { Menu, Notice, setIcon } from "obsidian";
 import type NoteDoctorPlugin from "../main";
-import type { NoteIssue } from "../types";
-import { ISSUE_TYPE_LABELS } from "../types";
+import type { IssueType, NoteIssue } from "../types";
+
+/** Short badge labels so the type chip doesn't starve the title in the sidebar. */
+const BADGE_LABELS: Record<IssueType, string> = {
+  stale: "Stale",
+  thin: "Thin",
+  orphan: "Orphan",
+  "missing-properties": "Missing",
+  "draft-marker": "Draft",
+  custom: "Custom",
+};
 
 export interface ResultsListOptions {
   bulkMode: boolean;
@@ -102,7 +111,7 @@ function renderRow(
   if (opts.showBadge) {
     row.createSpan({
       cls: `note-doctor-badge is-${issue.issueType}`,
-      text: ISSUE_TYPE_LABELS[issue.issueType],
+      text: BADGE_LABELS[issue.issueType],
     });
   }
 
@@ -121,18 +130,11 @@ function renderRow(
 
   // The title already opens the note; the action strip focuses on triage.
   const actions = row.createDiv({ cls: "note-doctor-row-actions" });
-  const reviewBtn = iconButton(actions, "check", "");
-  const paintReviewed = (): void => {
-    const on = plugin.isReviewed(issue);
-    setIcon(reviewBtn, on ? "rotate-ccw" : "check");
-    reviewBtn.setAttribute("aria-label", on ? "Mark not reviewed" : "Mark reviewed");
-    reviewBtn.toggleClass("is-active", on);
-  };
-  paintReviewed();
-  reviewBtn.addEventListener("click", () => {
-    void plugin.setReviewed(issue, !plugin.isReviewed(issue)).then(() => {
-      row.toggleClass("is-reviewed", plugin.isReviewed(issue));
-      paintReviewed();
+  // Rows shown here are outstanding; marking reviewed files it away (recover via
+  // the review queue's "mark not reviewed"). One-way keeps the list honest.
+  iconButton(actions, "check", "Mark reviewed", () => {
+    void plugin.setReviewed(issue, true).then(() => {
+      row.remove();
       opts.onCountsChanged();
     });
   });

@@ -9,6 +9,7 @@ import { ProfileEditModal } from "./ui/ProfileEditModal";
 
 export const DEFAULT_SETTINGS: NoteDoctorSettings = {
   version: 1,
+  enabledIssueTypes: [...ISSUE_TYPES],
   staleDaysThreshold: 90,
   minNoteLength: 150,
   requiredProperties: [],
@@ -85,6 +86,23 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const s = this.plugin.settings;
     new Setting(containerEl).setName("Scan").setHeading();
+
+    // Per-detector on/off (free): lets folder/tag-organized vaults turn off noisy
+    // categories like orphans without needing a Pro profile.
+    const builtInTypes: IssueType[] = ["stale", "thin", "orphan", "missing-properties", "draft-marker"];
+    for (const type of builtInTypes) {
+      new Setting(containerEl)
+        .setName(`Detect ${ISSUE_TYPE_LABELS[type].toLowerCase()}`)
+        .addToggle((t) =>
+          t.setValue(s.enabledIssueTypes.includes(type)).onChange((v) => {
+            const set = new Set(s.enabledIssueTypes);
+            if (v) set.add(type);
+            else set.delete(type);
+            s.enabledIssueTypes = ISSUE_TYPES.filter((it) => set.has(it));
+            this.plugin.queueSave();
+          })
+        );
+    }
 
     new Setting(containerEl)
       .setName("Stale after (days)")

@@ -110,8 +110,9 @@ export class NoteDoctorView extends ItemView {
     }
 
     const issues = this.plugin.visibleIssues();
-    // If the active filter's category has been fully cleared, fall back to All.
-    if (this.filter !== "all" && (countByType(issues)[this.filter] ?? 0) === 0) {
+    // If the active filter's category has no OUTSTANDING issues left, fall back to All.
+    const outstandingCounts = countByType(issues.filter((i) => !this.plugin.isReviewed(i)));
+    if (this.filter !== "all" && (outstandingCounts[this.filter] ?? 0) === 0) {
       this.filter = "all";
     }
 
@@ -267,25 +268,36 @@ export class NoteDoctorView extends ItemView {
       );
     }
 
-    this.renderTiles(host, issues);
+    // Tiles count OUTSTANDING issues too, so the breakdown agrees with the hero.
+    this.renderTiles(host, outstanding);
 
-    if (issues.length > 0) {
+    if (outstanding.length > 0) {
       host.createDiv({
         cls: "note-doctor-legend",
         text: "Severity: H high · M medium · L low",
       });
     }
 
-    if (issues.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
+    if (outstanding.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
       const nudge = host.createDiv({ cls: "note-doctor-nudge" });
       nudge.appendText("Also catch notes missing metadata? ");
       const link = nudge.createEl("button", {
         cls: "note-doctor-inline-link",
-        text: "Check for a required property",
+        text: "Flag notes missing a property",
       });
       link.addEventListener("click", () => {
-        this.plugin.settings.requiredProperties = ["tags"];
-        void this.plugin.saveSettings().then(() => this.plugin.runScan(this.plugin.lastResult?.profileId));
+        new PromptModal(
+          this.app,
+          "Flag notes missing which property?",
+          [{ key: "prop", label: "Property", placeholder: "tags" }],
+          (v) => {
+            const prop = v.prop.trim() || "tags";
+            this.plugin.settings.requiredProperties = [prop];
+            void this.plugin
+              .saveSettings()
+              .then(() => this.plugin.runScan(this.plugin.lastResult?.profileId));
+          }
+        ).open();
       });
     }
   }
@@ -294,14 +306,12 @@ export class NoteDoctorView extends ItemView {
     const counts = countByType(issues);
     const tiles = host.createDiv({ cls: "note-doctor-tiles" });
     this.tile(tiles, "All", issues.length, this.filter === "all", () => {
-      this.filter = "all";
-      this.render();
+      this.setFilter("all");
     });
     for (const type of ISSUE_TYPES) {
       if (counts[type] === 0) continue;
       this.tile(tiles, ISSUE_TYPE_LABELS[type], counts[type], this.filter === type, () => {
-        this.filter = type;
-        this.render();
+        this.setFilter(type);
       });
     }
   }
@@ -318,6 +328,14 @@ export class NoteDoctorView extends ItemView {
     tile.createDiv({ cls: "note-doctor-tile-count", text: String(count) });
     tile.createDiv({ cls: "note-doctor-tile-label", text: label });
     tile.addEventListener("click", onClick);
+  }
+
+  /** Switch the active type filter, clearing any bulk selection so a subsequent
+   *  bulk action can never touch notes the user filtered out of view. */
+  private setFilter(filter: Filter): void {
+    this.filter = filter;
+    this.selected.clear();
+    this.render();
   }
 
   /** Refresh only the stat/tiles/summary after an in-place row mutation. */
@@ -391,8 +409,10 @@ export class NoteDoctorView extends ItemView {
       this.render();
     });
 
+    // Scope to the currently-visible (filtered) view so bulk writes can only ever
+    // touch what the user can see.
     const selectedIssues = (): NoteIssue[] =>
-      this.plugin.visibleIssues().filter((i) => this.selected.has(i.id));
+      this.applyView().filter((i) => this.selected.has(i.id));
 
     this.bulkButton(bar, "Ignore", () =>
       void this.plugin.bulkIgnore(selectedIssues()).then(() => this.afterBulk())
@@ -497,11 +517,13 @@ export class NoteDoctorView extends ItemView {
     return this.sortCache;
   }
 
-  /** Sorted, not-ignored, filtered-by-active-type view of the current scan. */
+  /** Sorted, outstanding (not ignored, not reviewed), filtered-by-type view. */
   private applyView(): NoteIssue[] {
     return this.sortedIssues().filter(
       (i) =>
-        !this.plugin.isIgnored(i) && (this.filter === "all" || i.issueType === this.filter)
+        !this.plugin.isIgnored(i) &&
+        !this.plugin.isReviewed(i) &&
+        (this.filter === "all" || i.issueType === this.filter)
     );
   }
 }

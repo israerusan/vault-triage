@@ -214,7 +214,7 @@ export function resolveScanConfig(
   profile?: ScanProfile
 ): ScanConfig {
   const base: ScanConfig = {
-    enabledIssueTypes: [...ISSUE_TYPES],
+    enabledIssueTypes: settings.enabledIssueTypes ?? [...ISSUE_TYPES],
     staleDaysThreshold: settings.staleDaysThreshold,
     minNoteLength: settings.minNoteLength,
     requiredProperties: settings.requiredProperties,

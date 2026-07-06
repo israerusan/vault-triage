@@ -138,6 +138,9 @@ export interface LastScanSummary {
 export interface NoteDoctorSettings {
   version: number;
 
+  /** Which built-in issue types a default scan runs (free per-detector on/off). */
+  enabledIssueTypes: IssueType[];
+
   staleDaysThreshold: number;
   minNoteLength: number;
 

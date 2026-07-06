@@ -65,6 +65,10 @@ export default class NoteDoctorPlugin extends Plugin {
   /** Coalesces a burst of vault events into a single view refresh. */
   private refreshTimer: number | null = null;
 
+  /** A rescan requested while one was already running (run once after it ends). */
+  private rescanQueued = false;
+  private queuedProfileId?: string;
+
   async onload(): Promise<void> {
     await this.loadSettings();
     this.refreshLicense();
@@ -105,13 +109,13 @@ export default class NoteDoctorPlugin extends Plugin {
     // as they move or disappear.
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        if (this.migratePath(oldPath, file.path)) void this.saveSettings();
+        if (this.migratePath(oldPath, file.path)) this.scheduleSave();
         if (this.remapLastResult(oldPath, file.path)) this.scheduleRefresh();
       })
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (this.dropPath(file.path)) void this.saveSettings();
+        if (this.dropPath(file.path)) this.scheduleSave();
         if (this.dropLastResult(file.path)) this.scheduleRefresh();
       })
     );
@@ -260,7 +264,13 @@ export default class NoteDoctorPlugin extends Plugin {
   // --- Scanning -------------------------------------------------------------
 
   async runScan(profileId?: string): Promise<void> {
-    if (this.scanning) return; // re-entrancy guard: ignore overlapping triggers
+    if (this.scanning) {
+      // A scan is already running; remember to run once more after it finishes so
+      // a post-mutation rescan is never silently dropped.
+      this.rescanQueued = true;
+      this.queuedProfileId = profileId;
+      return;
+    }
     const profile = profileId
       ? this.settings.savedProfiles.find((p) => p.id === profileId)
       : undefined;
@@ -312,6 +322,12 @@ export default class NoteDoctorPlugin extends Plugin {
     } finally {
       this.scanning = false;
       this.refreshViews();
+      if (this.rescanQueued) {
+        this.rescanQueued = false;
+        const id = this.queuedProfileId;
+        this.queuedProfileId = undefined;
+        void this.runScan(id);
+      }
     }
   }
 
@@ -646,6 +662,7 @@ export default class NoteDoctorPlugin extends Plugin {
    */
   async settleCacheThenRescan(paths: string[]): Promise<void> {
     if (paths.length > 0) {
+      if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
       await new Promise<void>((resolve) => {
         this.settleTimer = window.setTimeout(() => {
           this.settleTimer = null;
@@ -653,7 +670,7 @@ export default class NoteDoctorPlugin extends Plugin {
         }, 500);
       });
     }
-    if (this.settleTimer === null) await this.runScan(this.lastResult?.profileId);
+    await this.runScan(this.lastResult?.profileId);
   }
 
   /** Public debounced-save hook for the settings tab's field edits. */

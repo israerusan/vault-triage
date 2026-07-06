@@ -7,6 +7,18 @@
   font-size: var(--font-ui-small);
 }
 
+/* Explicit keyboard focus ring — our custom buttons strip native chrome, so give
+   them a visible focus indicator that doesn't depend on theme cascade luck. */
+.note-doctor-row-title:focus-visible,
+.note-doctor-tile:focus-visible,
+.note-doctor-icon-btn:focus-visible,
+.note-doctor-inline-link:focus-visible,
+.note-doctor-cta-dismiss:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  border-radius: var(--radius-s);
+}
+
 .note-doctor-header {
   display: flex;
   align-items: center;
@@ -392,14 +404,15 @@ button.note-doctor-tile:hover {
   border-radius: var(--radius-s);
   font-size: var(--font-ui-smaller);
   font-weight: var(--font-bold);
-  color: var(--text-on-accent);
+  /* Neutral fill + colored LETTER: theme-safe (no hardcoded text-on-color hex) and
+     accessible — the H/M/L letter carries the tier even if hue is imperceptible. */
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
 }
 
-.note-doctor-sev.is-high { background: var(--color-red); }
-/* Orange is too light for white text; dark text keeps the "M" legible in both themes. */
-.note-doctor-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
-/* Neutral fill needs normal-weight text (not muted) so the "L" stays readable in dark themes. */
-.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-normal); }
+.note-doctor-sev.is-high { color: var(--color-red); }
+.note-doctor-sev.is-med { color: var(--color-orange); }
+.note-doctor-sev.is-low { color: var(--text-muted); }
 
 .note-doctor-row-folder {
   color: var(--text-faint);
@@ -467,8 +480,15 @@ button.note-doctor-tile:hover {
 
 .note-doctor-review-actions {
   display: flex;
-  gap: var(--size-4-2);
+  flex-wrap: wrap;
+  gap: var(--size-2-2);
   margin-bottom: var(--size-4-3);
+}
+
+.note-doctor-review-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
 }
 
 .note-doctor-review-nav {

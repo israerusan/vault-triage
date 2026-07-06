@@ -119,8 +119,12 @@ export class ReviewQueueModal extends Modal {
     tooltip: string,
     onClick: () => void
   ): void {
-    const btn = parent.createEl("button", { cls: "note-doctor-icon-btn clickable-icon" });
-    setIcon(btn, icon);
+    // Labelled (icon + text) — a modal has room, and it makes shortcuts and the
+    // "— Pro" suffix visible without hovering.
+    const btn = parent.createEl("button", { cls: "note-doctor-review-action" });
+    const iconEl = btn.createSpan();
+    setIcon(iconEl, icon);
+    btn.createSpan({ text: tooltip });
     btn.setAttribute("aria-label", tooltip);
     btn.addEventListener("click", onClick);
   }

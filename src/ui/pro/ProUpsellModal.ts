@@ -1,11 +1,5 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import { PRO_NAME, PRO_PRICE_LABEL, PRO_TAGLINE, PRO_UPSELL, PURCHASE_URL } from "../../product";
-
-/** Obsidian's internal settings window — used to jump to the license field. */
-interface SettingApi {
-  open: () => void;
-  openTabById: (id: string) => void;
-}
 
 /**
  * An actionable upsell shown the moment a free user reaches for a Pro feature:
@@ -33,19 +27,12 @@ export class ProUpsellModal extends Modal {
     const haveKey = actions.createEl("button", { text: "I have a license key" });
     haveKey.addEventListener("click", () => {
       this.close();
-      this.openLicenseSettings();
+      // Plain instruction instead of a private-API jump into settings.
+      new Notice("Open Settings → Community plugins → Note Doctor → Pro license and paste your key.");
     });
   }
 
   onClose(): void {
     this.contentEl.empty();
-  }
-
-  private openLicenseSettings(): void {
-    // No public API opens a specific settings tab; feature-detected + optional so
-    // it degrades to a no-op if the internal shape ever changes.
-    const setting = (this.app as unknown as { setting?: SettingApi }).setting;
-    setting?.open();
-    setting?.openTabById("note-doctor");
   }
 }
