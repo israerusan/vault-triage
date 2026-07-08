@@ -1,7 +1,7 @@
 {
   "id": "vault-triage",
   "name": "Vault Triage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.4.0",
   "description": "Find stale, orphaned, unfinished, and metadata-broken notes, then work through them with a focused review flow.",
   "author": "Israel Avila",

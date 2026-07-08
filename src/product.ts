@@ -11,7 +11,7 @@ export const PRODUCT_NAME = "Vault Triage";
 export const PRO_NAME = "Vault Triage Pro";
 
 /** Where "Unlock Pro" sends people. Confirm the real handle before release. */
-export const PURCHASE_URL = "https://github.com/israerusan/vault-triage#pro";
+export const PURCHASE_URL = "https://github.com/israerusan/vault-triage#buy-pro";
 
 /** One-time price. Kept in one place so every surface stays consistent. */
 export const PRO_PRICE_LABEL = "$12 one-time";

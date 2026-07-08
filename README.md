@@ -1,14 +1,12 @@
 # Vault Triage
 
-**The fastest way to figure out which notes deserve attention next.**
+**A ruthless review queue for the notes that actually need attention.**
 
 Vault Triage scans your vault for stale notes, thin notes, orphan notes, missing metadata, and unfinished drafts — then gives you a clean review workflow so maintenance stops feeling like a side quest from hell.
 
 Free gets you real scanning and one-note-at-a-time cleanup. Pro adds saved audits, custom rules, bulk workflows, severity tuning, and Markdown reports.
 
 > Local-first, privacy-friendly, and built to help you decide what to fix first instead of burying you in note guilt.
-
-<!-- TODO: screenshot — dashboard showing issue counts by category -->
 
 ## Why Vault Triage exists
 
@@ -87,12 +85,31 @@ You can customize:
 
 Vault Triage Pro uses an offline license key.
 
-- one-time purchase model
+- one-time payment
 - no account required
 - no always-online checks
 - validated locally in your vault
 
 Pro is for people who want recurring audits, custom standards, bulk cleanup workflows, and exportable reports instead of babysitting maintenance manually.
+
+## Buy Pro
+
+Vault Triage Pro uses an offline license key and a one-time payment.
+
+What you get:
+- saved audits
+- custom rules
+- bulk workflows
+- severity tuning
+- Markdown report export
+
+Current delivery model:
+- one-time purchase
+- no account required
+- offline license verification
+- license key delivered manually by the author after purchase
+
+Current sales are fulfilled manually by the author and delivered as offline license keys. Replace this with instant checkout before you try to scale paid distribution.
 
 ## Privacy
 

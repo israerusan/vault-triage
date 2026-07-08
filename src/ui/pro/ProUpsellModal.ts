@@ -3,7 +3,7 @@ import { PRO_NAME, PRO_PRICE_LABEL, PRO_TAGLINE, PRO_UPSELL, PURCHASE_URL } from
 
 /**
  * An actionable upsell shown the moment a free user reaches for a Pro feature:
- * what they get, the price, a real buy link, and a shortcut to paste a key —
+ * what they get, the price, a clear purchase-info link, and a shortcut to paste a key —
  * instead of a toast that fades with no next step.
  */
 export class ProUpsellModal extends Modal {
@@ -20,7 +20,7 @@ export class ProUpsellModal extends Modal {
 
     const actions = contentEl.createDiv({ cls: "vault-triage-upsell-actions" });
     actions.createEl("a", {
-      text: `Get Pro — ${PRO_PRICE_LABEL}`,
+      text: `Buy Pro info — ${PRO_PRICE_LABEL}`,
       cls: "vault-triage-cta-link",
       href: PURCHASE_URL,
     });
