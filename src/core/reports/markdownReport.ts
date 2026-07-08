@@ -29,7 +29,7 @@ function stripMdExtension(name: string): string {
 export function buildMarkdownReport(input: ReportInput): string {
   const lines: string[] = [];
 
-  lines.push("# Note Doctor Report");
+  lines.push("# Vault Triage Report");
   lines.push(`Date: ${input.scannedAt}`);
   if (input.profileName) {
     lines.push(`Profile: ${input.profileName}`);

@@ -75,7 +75,7 @@ export default class NoteDoctorPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_NOTE_DOCTOR, (leaf) => new NoteDoctorView(leaf, this));
 
-    this.addRibbonIcon("stethoscope", "Open Note Doctor", () => {
+    this.addRibbonIcon("stethoscope", "Open Vault Triage", () => {
       void this.activateView();
     });
 
@@ -275,7 +275,7 @@ export default class NoteDoctorPlugin extends Plugin {
       ? this.settings.savedProfiles.find((p) => p.id === profileId)
       : undefined;
     if (profileId && !profile) {
-      new Notice("Note Doctor: saved profile not found.");
+      new Notice("Vault Triage: saved profile not found.");
       return;
     }
 
@@ -325,8 +325,8 @@ export default class NoteDoctorPlugin extends Plugin {
           `${outstanding.length} ${plural(outstanding.length, "issue")} in ${affected} ${plural(affected, "note")}.`
       );
     } catch (err) {
-      console.error("Note Doctor: scan failed", err);
-      new Notice("Note Doctor: scan failed. See the console for details.");
+      console.error("Vault Triage: scan failed", err);
+      new Notice("Vault Triage: scan failed. See the console for details.");
     } finally {
       this.scanning = false;
       this.refreshViews();
@@ -387,7 +387,7 @@ export default class NoteDoctorPlugin extends Plugin {
     // Excluding is permanent; offer a one-click undo like ignore does.
     const frag = createFragment((f) => {
       f.appendText(`Excluded "${path}" from future scans. `);
-      const undo = f.createEl("a", { text: "Undo", cls: "note-doctor-inline-link" });
+      const undo = f.createEl("a", { text: "Undo", cls: "vault-triage-inline-link" });
       undo.addEventListener("click", () => void this.unexcludeNote(path));
     });
     new Notice(frag, 6000);
@@ -534,7 +534,7 @@ export default class NoteDoctorPlugin extends Plugin {
     requirePro(this, "profiles", () => {
       const profiles = this.settings.savedProfiles;
       if (profiles.length === 0) {
-        new Notice("Note Doctor: no saved profiles yet. Create one in settings.");
+        new Notice("Vault Triage: no saved profiles yet. Create one in settings.");
         return;
       }
       const run = (id: string): void =>
@@ -588,7 +588,7 @@ export default class NoteDoctorPlugin extends Plugin {
    */
   async bulkAddProperty(paths: string[], key: string, value: string): Promise<string[]> {
     if (!isMeaningful(value)) {
-      new Notice("Note Doctor: enter a value for the property.");
+      new Notice("Vault Triage: enter a value for the property.");
       return [];
     }
     const changed: string[] = [];
@@ -605,7 +605,7 @@ export default class NoteDoctorPlugin extends Plugin {
           didSet = true;
         });
       } catch (err) {
-        console.error(`Note Doctor: could not edit ${path}`, err);
+        console.error(`Vault Triage: could not edit ${path}`, err);
         failed++;
         continue;
       }
@@ -652,7 +652,7 @@ export default class NoteDoctorPlugin extends Plugin {
           added = true;
         });
       } catch (err) {
-        console.error(`Note Doctor: could not tag ${path}`, err);
+        console.error(`Vault Triage: could not tag ${path}`, err);
         failed++;
         continue;
       }
@@ -705,7 +705,7 @@ export default class NoteDoctorPlugin extends Plugin {
 
   async exportReport(issues?: NoteIssue[]): Promise<void> {
     if (!this.lastResult) {
-      new Notice("Note Doctor: run a scan before exporting a report.");
+      new Notice("Vault Triage: run a scan before exporting a report.");
       return;
     }
     // Default export = outstanding (exclude reviewed), matching "Export selected".
@@ -731,8 +731,8 @@ export default class NoteDoctorPlugin extends Plugin {
       await this.app.workspace.getLeaf(false).openFile(file);
       new Notice(`${PRODUCT_NAME}: report exported.`);
     } catch (err) {
-      console.error("Note Doctor: report export failed", err);
-      new Notice("Note Doctor: could not write the report. See the console for details.");
+      console.error("Vault Triage: report export failed", err);
+      new Notice("Vault Triage: could not write the report. See the console for details.");
     }
   }
 

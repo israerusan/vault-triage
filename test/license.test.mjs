@@ -10,7 +10,7 @@ const { verifyLicense } = await import(
   pathToFileURL(path.join(root, "src", "shared", "verifyLicense.mjs")).href
 );
 
-const PRODUCT = "note-doctor";
+const PRODUCT = "vault-triage";
 
 function b64url(bytes) {
   return Buffer.from(bytes)

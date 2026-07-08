@@ -51,12 +51,12 @@ export function renderResultsList(
   opts: ResultsListOptions
 ): void {
   if (issues.length === 0) {
-    container.createDiv({ cls: "note-doctor-empty", text: "No issues here. Nice and tidy." });
+    container.createDiv({ cls: "vault-triage-empty", text: "No issues here. Nice and tidy." });
     return;
   }
 
-  const list = container.createDiv({ cls: "note-doctor-results" });
-  const footer = container.createDiv({ cls: "note-doctor-results-footer" });
+  const list = container.createDiv({ cls: "vault-triage-results" });
+  const footer = container.createDiv({ cls: "vault-triage-results-footer" });
   // Track every row per note path so "exclude note" can remove them all at once.
   const rowsByPath = new Map<string, HTMLElement[]>();
   let shown = 0;
@@ -86,14 +86,14 @@ function renderRow(
   opts: ResultsListOptions,
   rowsByPath: Map<string, HTMLElement[]>
 ): void {
-  const row = list.createDiv({ cls: "note-doctor-row" });
+  const row = list.createDiv({ cls: "vault-triage-row" });
   if (plugin.isReviewed(issue)) row.addClass("is-reviewed");
   const bucket = rowsByPath.get(issue.notePath) ?? [];
   bucket.push(row);
   rowsByPath.set(issue.notePath, bucket);
 
   if (opts.bulkMode) {
-    const check = row.createEl("input", { type: "checkbox", cls: "note-doctor-check" });
+    const check = row.createEl("input", { type: "checkbox", cls: "vault-triage-check" });
     check.checked = opts.selected.has(issue.id);
     check.setAttribute("aria-label", `Select ${issue.noteName}`);
     check.addEventListener("change", () => {
@@ -105,31 +105,31 @@ function renderRow(
 
   // Severity as a letter tier (H/M/L), not color alone — colorblind-safe.
   const tier = severityTier(issue.severity);
-  const tierEl = row.createSpan({ cls: `note-doctor-sev ${tier.cls}`, text: tier.label[0] });
+  const tierEl = row.createSpan({ cls: `vault-triage-sev ${tier.cls}`, text: tier.label[0] });
   tierEl.setAttribute("aria-label", `${tier.label} severity`);
 
   if (opts.showBadge) {
     row.createSpan({
-      cls: `note-doctor-badge is-${issue.issueType}`,
+      cls: `vault-triage-badge is-${issue.issueType}`,
       text: BADGE_LABELS[issue.issueType],
     });
   }
 
-  const main = row.createDiv({ cls: "note-doctor-row-main" });
-  const title = main.createEl("button", { cls: "note-doctor-row-title", text: issue.noteName });
+  const main = row.createDiv({ cls: "vault-triage-row-main" });
+  const title = main.createEl("button", { cls: "vault-triage-row-title", text: issue.noteName });
   // Full path as the accessible name (Obsidian shows it on hover) so long or
   // duplicate basenames are readable and disambiguated.
   title.setAttribute("aria-label", issue.notePath);
   title.addEventListener("click", () => void plugin.openNote(issue.notePath));
   const slash = issue.notePath.lastIndexOf("/");
   if (slash > 0) {
-    main.createDiv({ cls: "note-doctor-row-folder", text: issue.notePath.slice(0, slash) });
+    main.createDiv({ cls: "vault-triage-row-folder", text: issue.notePath.slice(0, slash) });
   }
-  const reasonEl = main.createDiv({ cls: "note-doctor-row-reason", text: issue.reason });
+  const reasonEl = main.createDiv({ cls: "vault-triage-row-reason", text: issue.reason });
   reasonEl.setAttribute("aria-label", issue.reason);
 
   // The title already opens the note; the action strip focuses on triage.
-  const actions = row.createDiv({ cls: "note-doctor-row-actions" });
+  const actions = row.createDiv({ cls: "vault-triage-row-actions" });
   // Rows shown here are outstanding; marking reviewed files it away (recover via
   // the review queue's "mark not reviewed"). One-way keeps the list honest.
   iconButton(actions, "check", "Mark reviewed", () => {
@@ -146,7 +146,7 @@ function renderRow(
       // Offer a one-click undo so an accidental ignore isn't a silent one-way trip.
       const frag = createFragment((f) => {
         f.appendText(`Ignored "${issue.noteName}". `);
-        const undo = f.createEl("a", { text: "Undo", cls: "note-doctor-inline-link" });
+        const undo = f.createEl("a", { text: "Undo", cls: "vault-triage-inline-link" });
         undo.addEventListener("click", () => {
           void plugin.setIgnored(issue, false).then(() => plugin.refreshViews());
         });
@@ -185,7 +185,7 @@ function iconButton(
   tooltip: string,
   onClick?: (evt: MouseEvent) => void
 ): HTMLButtonElement {
-  const btn = parent.createEl("button", { cls: "note-doctor-icon-btn clickable-icon" });
+  const btn = parent.createEl("button", { cls: "vault-triage-icon-btn clickable-icon" });
   setIcon(btn, icon);
   if (tooltip) btn.setAttribute("aria-label", tooltip);
   if (onClick) btn.addEventListener("click", onClick);

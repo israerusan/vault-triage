@@ -15,20 +15,20 @@ export class ProUpsellModal extends Modal {
     const { contentEl } = this;
     this.titleEl.setText(`${PRO_NAME} — ${PRO_PRICE_LABEL}`);
 
-    contentEl.createDiv({ cls: "note-doctor-upsell-lead", text: PRO_UPSELL[this.feature] });
-    contentEl.createDiv({ cls: "note-doctor-upsell-sub", text: PRO_TAGLINE });
+    contentEl.createDiv({ cls: "vault-triage-upsell-lead", text: PRO_UPSELL[this.feature] });
+    contentEl.createDiv({ cls: "vault-triage-upsell-sub", text: PRO_TAGLINE });
 
-    const actions = contentEl.createDiv({ cls: "note-doctor-upsell-actions" });
+    const actions = contentEl.createDiv({ cls: "vault-triage-upsell-actions" });
     actions.createEl("a", {
       text: `Get Pro — ${PRO_PRICE_LABEL}`,
-      cls: "note-doctor-cta-link",
+      cls: "vault-triage-cta-link",
       href: PURCHASE_URL,
     });
     const haveKey = actions.createEl("button", { text: "I have a license key" });
     haveKey.addEventListener("click", () => {
       this.close();
       // Plain instruction instead of a private-API jump into settings.
-      new Notice("Open Settings → Community plugins → Note Doctor → Pro license and paste your key.");
+      new Notice("Open Settings → Community plugins → Vault Triage → Pro license and paste your key.");
     });
   }
 

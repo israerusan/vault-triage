@@ -1,4 +1,4 @@
-// The shared data contract for Note Doctor. Detectors, the rule engine, severity
+// The shared data contract for Vault Triage. Detectors, the rule engine, severity
 // scoring, reports, and the UI all speak these types. Kept dependency-free (no
 // `obsidian` import) so the core is pure and unit-testable under Node.
 

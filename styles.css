@@ -1,25 +1,25 @@
-/* Note Doctor — all styling lives here (no inline JS styles, per Obsidian review).
+/* Vault Triage — all styling lives here (no inline JS styles, per Obsidian review).
    Everything is built on Obsidian CSS variables so it adapts to the active theme,
    light or dark, and to the user's interface-font size. */
 
-.note-doctor-view {
+.vault-triage-view {
   padding: var(--size-4-3);
   font-size: var(--font-ui-small);
 }
 
 /* Explicit keyboard focus ring — our custom buttons strip native chrome, so give
    them a visible focus indicator that doesn't depend on theme cascade luck. */
-.note-doctor-row-title:focus-visible,
-.note-doctor-tile:focus-visible,
-.note-doctor-icon-btn:focus-visible,
-.note-doctor-inline-link:focus-visible,
-.note-doctor-cta-dismiss:focus-visible {
+.vault-triage-row-title:focus-visible,
+.vault-triage-tile:focus-visible,
+.vault-triage-icon-btn:focus-visible,
+.vault-triage-inline-link:focus-visible,
+.vault-triage-cta-dismiss:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
   border-radius: var(--radius-s);
 }
 
-.note-doctor-header {
+.vault-triage-header {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
@@ -27,19 +27,19 @@
   margin-bottom: var(--size-4-2);
 }
 
-.note-doctor-header h2 {
+.vault-triage-header h2 {
   margin: 0;
   margin-right: auto;
   font-size: var(--font-ui-large);
 }
 
-.note-doctor-summary {
+.vault-triage-summary {
   color: var(--text-muted);
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-toolbar,
-.note-doctor-bulk-bar {
+.vault-triage-toolbar,
+.vault-triage-bulk-bar {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
@@ -47,7 +47,7 @@
   margin-bottom: var(--size-4-2);
 }
 
-.note-doctor-bulk-bar {
+.vault-triage-bulk-bar {
   padding: var(--size-4-2);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -56,13 +56,13 @@
 
 /* Results list */
 
-.note-doctor-results {
+.vault-triage-results {
   display: flex;
   flex-direction: column;
   gap: var(--size-2-2);
 }
 
-.note-doctor-row {
+.vault-triage-row {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
@@ -72,15 +72,15 @@
   background: var(--background-primary);
 }
 
-.note-doctor-row:hover {
+.vault-triage-row:hover {
   background: var(--background-modifier-hover);
 }
 
-.note-doctor-row.is-reviewed {
+.vault-triage-row.is-reviewed {
   opacity: 0.55;
 }
 
-.note-doctor-row-main {
+.vault-triage-row-main {
   display: flex;
   flex-direction: column;
   gap: var(--size-2-1);
@@ -88,7 +88,7 @@
   flex: 1;
 }
 
-.note-doctor-row-title {
+.vault-triage-row-title {
   /* A focusable button styled as a link (keyboard-operable, no button chrome). */
   appearance: none;
   border: none;
@@ -107,25 +107,25 @@
   width: 100%;
 }
 
-.note-doctor-row-title:hover {
+.vault-triage-row-title:hover {
   color: var(--text-accent);
   text-decoration: underline;
 }
 
-.note-doctor-row-reason {
+.vault-triage-row-reason {
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.note-doctor-row-actions {
+.vault-triage-row-actions {
   display: flex;
   gap: var(--size-2-1);
   flex-shrink: 0;
 }
 
-.note-doctor-icon-btn {
+.vault-triage-icon-btn {
   appearance: none;
   border: none;
   background: none;
@@ -139,7 +139,7 @@
   cursor: pointer;
 }
 
-.note-doctor-icon-btn:hover {
+.vault-triage-icon-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
@@ -147,13 +147,13 @@
 /* The destructive "ignore" action is set apart (gap + a faint danger tint at rest)
    and turns solid danger on hover, so it never reads like the benign reviewed
    toggle right next to it. */
-.note-doctor-icon-btn.is-danger {
+.vault-triage-icon-btn.is-danger {
   margin-left: var(--size-4-1);
   color: var(--text-error);
   opacity: 0.75;
 }
 
-.note-doctor-icon-btn.is-danger:hover {
+.vault-triage-icon-btn.is-danger:hover {
   opacity: 1;
   background: var(--background-modifier-error);
   color: var(--text-on-accent);
@@ -163,7 +163,7 @@
 
 /* Type badge is neutral so it doesn't compete with the severity chip's color —
    exactly one channel (severity) carries saturated hue. Type reads from its label. */
-.note-doctor-badge {
+.vault-triage-badge {
   flex-shrink: 1;
   min-width: 0;
   max-width: 8em;
@@ -179,11 +179,11 @@
 }
 
 /* Keep the note title readable in the narrow sidebar even next to a badge. */
-.note-doctor-row-main {
+.vault-triage-row-main {
   min-width: 6em;
 }
 
-.note-doctor-empty {
+.vault-triage-empty {
   color: var(--text-muted);
   padding: var(--size-4-4) 0;
   text-align: center;
@@ -191,7 +191,7 @@
 
 /* Pro surfaces */
 
-.note-doctor-pro-pill {
+.vault-triage-pro-pill {
   margin-left: var(--size-4-2);
   padding: 0 var(--size-4-1);
   border-radius: var(--radius-s);
@@ -201,11 +201,11 @@
   vertical-align: middle;
 }
 
-.note-doctor-locked {
+.vault-triage-locked {
   opacity: 0.9;
 }
 
-.note-doctor-pro-cta {
+.vault-triage-pro-cta {
   margin-top: var(--size-4-4);
   padding: var(--size-4-3);
   border: 1px solid var(--background-modifier-border);
@@ -218,8 +218,8 @@
 }
 
 /* Anchor styled as a button (external links routed by Obsidian). */
-.note-doctor-external-btn,
-a.note-doctor-cta-link {
+.vault-triage-external-btn,
+a.vault-triage-cta-link {
   display: inline-flex;
   align-items: center;
   padding: var(--size-2-2) var(--size-4-3);
@@ -231,8 +231,8 @@ a.note-doctor-cta-link {
   cursor: pointer;
 }
 
-.note-doctor-external-btn:hover,
-a.note-doctor-cta-link:hover {
+.vault-triage-external-btn:hover,
+a.vault-triage-cta-link:hover {
   background: var(--interactive-accent-hover);
   color: var(--text-on-accent);
   text-decoration: none;
@@ -240,7 +240,7 @@ a.note-doctor-cta-link:hover {
 
 /* First-run onboarding */
 
-.note-doctor-onboarding {
+.vault-triage-onboarding {
   margin-top: var(--size-4-3);
   padding: var(--size-4-4);
   border: 1px solid var(--background-modifier-border);
@@ -248,17 +248,17 @@ a.note-doctor-cta-link:hover {
   background: var(--background-secondary);
 }
 
-.note-doctor-onboarding h3 {
+.vault-triage-onboarding h3 {
   margin: 0 0 var(--size-2-2);
 }
 
-.note-doctor-onboarding-blurb {
+.vault-triage-onboarding-blurb {
   color: var(--text-muted);
   margin-bottom: var(--size-2-3);
   line-height: var(--line-height-normal);
 }
 
-.note-doctor-onboarding-hint {
+.vault-triage-onboarding-hint {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   margin-bottom: var(--size-4-3);
@@ -266,7 +266,7 @@ a.note-doctor-cta-link:hover {
 
 /* Determinate scan progress */
 
-.note-doctor-progress {
+.vault-triage-progress {
   height: 4px;
   border-radius: 2px;
   background: var(--background-modifier-border);
@@ -274,7 +274,7 @@ a.note-doctor-cta-link:hover {
   margin-top: var(--size-2-2);
 }
 
-.note-doctor-progress-bar {
+.vault-triage-progress-bar {
   height: 100%;
   width: 0;
   background: var(--interactive-accent);
@@ -282,29 +282,29 @@ a.note-doctor-cta-link:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .note-doctor-progress-bar {
+  .vault-triage-progress-bar {
     transition: none;
   }
 }
 
 /* Contextual "add required properties" nudge */
-.note-doctor-nudge {
+.vault-triage-nudge {
   margin-top: var(--size-4-2);
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
 }
 
 /* Pro upsell modal */
-.note-doctor-upsell-lead {
+.vault-triage-upsell-lead {
   margin-bottom: var(--size-2-2);
 }
 
-.note-doctor-upsell-sub {
+.vault-triage-upsell-sub {
   color: var(--text-muted);
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-upsell-actions {
+.vault-triage-upsell-actions {
   display: flex;
   gap: var(--size-4-2);
   align-items: center;
@@ -312,47 +312,47 @@ a.note-doctor-cta-link:hover {
 
 /* Windowed results: "show more" footer */
 
-.note-doctor-results-footer {
+.vault-triage-results-footer {
   display: flex;
   justify-content: center;
   margin-top: var(--size-4-2);
 }
 
-.note-doctor-results-footer:empty {
+.vault-triage-results-footer:empty {
   margin-top: 0;
 }
 
 /* Header stat + category tiles */
 
-.note-doctor-meta {
+.vault-triage-meta {
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-stat {
+.vault-triage-stat {
   display: flex;
   align-items: baseline;
   gap: var(--size-2-2);
 }
 
-.note-doctor-stat-num {
+.vault-triage-stat-num {
   font-size: 2em;
   font-weight: var(--font-bold);
   line-height: 1;
   color: var(--text-normal);
 }
 
-.note-doctor-stat-label {
+.vault-triage-stat-label {
   color: var(--text-muted);
 }
 
-.note-doctor-tiles {
+.vault-triage-tiles {
   display: flex;
   flex-wrap: wrap;
   gap: var(--size-2-2);
   margin-top: var(--size-4-2);
 }
 
-.note-doctor-tile {
+.vault-triage-tile {
   appearance: none;
   box-shadow: none;
   font: inherit;
@@ -367,26 +367,26 @@ a.note-doctor-cta-link:hover {
   cursor: pointer;
 }
 
-button.note-doctor-tile:hover {
+button.vault-triage-tile:hover {
   background: var(--background-modifier-hover);
 }
 
-.note-doctor-tile.is-static {
+.vault-triage-tile.is-static {
   cursor: default;
 }
 
-.note-doctor-tile.is-active {
+.vault-triage-tile.is-active {
   border-color: var(--interactive-accent);
   background: var(--background-modifier-hover);
 }
 
-.note-doctor-tile-count {
+.vault-triage-tile-count {
   font-size: var(--font-ui-large);
   font-weight: var(--font-semibold);
   color: var(--text-normal);
 }
 
-.note-doctor-tile-label {
+.vault-triage-tile-label {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   white-space: nowrap;
@@ -394,7 +394,7 @@ button.note-doctor-tile:hover {
 
 /* Severity tier chip (letter + color, so it's legible without relying on hue) */
 
-.note-doctor-sev {
+.vault-triage-sev {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -410,11 +410,11 @@ button.note-doctor-tile:hover {
   color: #fff;
 }
 
-.note-doctor-sev.is-high { background: var(--color-red); }
-.note-doctor-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
-.note-doctor-sev.is-low { background: var(--background-modifier-border); color: var(--text-normal); }
+.vault-triage-sev.is-high { background: var(--color-red); }
+.vault-triage-sev.is-med { background: var(--color-orange); color: #1a1a1a; }
+.vault-triage-sev.is-low { background: var(--background-modifier-border); color: var(--text-normal); }
 
-.note-doctor-row-folder {
+.vault-triage-row-folder {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   overflow: hidden;
@@ -422,13 +422,13 @@ button.note-doctor-tile:hover {
   white-space: nowrap;
 }
 
-.note-doctor-review-legend {
+.vault-triage-review-legend {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   margin: var(--size-4-2) 0;
 }
 
-.note-doctor-inline-link {
+.vault-triage-inline-link {
   appearance: none;
   border: none;
   background: none;
@@ -440,74 +440,74 @@ button.note-doctor-tile:hover {
   text-decoration: underline;
 }
 
-.note-doctor-icon-btn.is-active {
+.vault-triage-icon-btn.is-active {
   color: var(--text-success);
 }
 
 /* Review queue modal */
 
-.note-doctor-review-count {
+.vault-triage-review-count {
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
 }
 
-.note-doctor-review-header {
+.vault-triage-review-header {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
   margin-top: var(--size-2-2);
 }
 
-.note-doctor-reviewed-tag {
+.vault-triage-reviewed-tag {
   color: var(--text-success);
   font-size: var(--font-ui-smaller);
 }
 
-.note-doctor-review-title {
+.vault-triage-review-title {
   margin: var(--size-4-2) 0 var(--size-2-2);
 }
 
-.note-doctor-review-reason {
+.vault-triage-review-reason {
   color: var(--text-normal);
   margin-bottom: var(--size-2-2);
 }
 
-.note-doctor-review-path {
+.vault-triage-review-path {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-review-actions {
+.vault-triage-review-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--size-2-2);
   margin-bottom: var(--size-4-3);
 }
 
-.note-doctor-review-action {
+.vault-triage-review-action {
   display: inline-flex;
   align-items: center;
   gap: var(--size-2-2);
 }
 
-.note-doctor-review-nav {
+.vault-triage-review-nav {
   display: flex;
   justify-content: space-between;
   gap: var(--size-4-2);
 }
 
-.note-doctor-legend {
+.vault-triage-legend {
   color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   margin-top: var(--size-2-2);
 }
 
-.note-doctor-pro-cta {
+.vault-triage-pro-cta {
   position: relative;
 }
 
-.note-doctor-cta-dismiss {
+.vault-triage-cta-dismiss {
   appearance: none;
   border: none;
   background: none;
@@ -521,7 +521,7 @@ button.note-doctor-tile:hover {
   cursor: pointer;
 }
 
-.note-doctor-header-upsell {
+.vault-triage-header-upsell {
   font-size: var(--font-ui-smaller);
   color: var(--text-accent);
 }

@@ -280,7 +280,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
     // Anchor (not window.open) so Obsidian routes it to the OS on desktop and mobile.
     actions.controlEl.createEl("a", {
       text: "Get Pro",
-      cls: "note-doctor-external-btn",
+      cls: "vault-triage-external-btn",
       href: PURCHASE_URL,
     });
   }
@@ -414,13 +414,13 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
   private proHeading(title: string): void {
     const { containerEl } = this;
     const heading = new Setting(containerEl).setName(title).setHeading();
-    heading.nameEl.createSpan({ text: "Pro", cls: "note-doctor-pro-pill" });
+    heading.nameEl.createSpan({ text: "Pro", cls: "vault-triage-pro-pill" });
     if (!this.plugin.isPro) {
       const upsell = new Setting(containerEl).setDesc(PRO_TAGLINE);
-      upsell.settingEl.addClass("note-doctor-locked");
+      upsell.settingEl.addClass("vault-triage-locked");
       upsell.controlEl.createEl("a", {
         text: "Unlock Pro",
-        cls: "note-doctor-external-btn",
+        cls: "vault-triage-external-btn",
         href: PURCHASE_URL,
       });
     }

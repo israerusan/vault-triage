@@ -22,7 +22,7 @@ export class ReviewQueueModal extends Modal {
 
   onOpen(): void {
     this.titleEl.setText("Review flagged notes");
-    this.modalEl.addClass("note-doctor-review-modal");
+    this.modalEl.addClass("vault-triage-review-modal");
     this.registerKeys();
     this.renderCurrent();
   }
@@ -65,24 +65,24 @@ export class ReviewQueueModal extends Modal {
     }
 
     contentEl.createDiv({
-      cls: "note-doctor-review-count",
+      cls: "vault-triage-review-count",
       text: `${this.index + 1} of ${this.queue.length}`,
     });
 
-    const header = contentEl.createDiv({ cls: "note-doctor-review-header" });
+    const header = contentEl.createDiv({ cls: "vault-triage-review-header" });
     header.createSpan({
-      cls: `note-doctor-badge is-${issue.issueType}`,
+      cls: `vault-triage-badge is-${issue.issueType}`,
       text: ISSUE_TYPE_LABELS[issue.issueType],
     });
     if (this.plugin.isReviewed(issue)) {
-      header.createSpan({ cls: "note-doctor-reviewed-tag", text: "Reviewed" });
+      header.createSpan({ cls: "vault-triage-reviewed-tag", text: "Reviewed" });
     }
 
-    contentEl.createEl("h3", { text: issue.noteName, cls: "note-doctor-review-title" });
-    contentEl.createDiv({ cls: "note-doctor-review-reason", text: issue.reason });
-    contentEl.createDiv({ cls: "note-doctor-review-path", text: issue.notePath });
+    contentEl.createEl("h3", { text: issue.noteName, cls: "vault-triage-review-title" });
+    contentEl.createDiv({ cls: "vault-triage-review-reason", text: issue.reason });
+    contentEl.createDiv({ cls: "vault-triage-review-path", text: issue.notePath });
 
-    const actions = contentEl.createDiv({ cls: "note-doctor-review-actions" });
+    const actions = contentEl.createDiv({ cls: "vault-triage-review-actions" });
     this.actionButton(actions, "file-search", "Open note (o)", () => void this.openCurrent());
     this.actionButton(
       actions,
@@ -103,11 +103,11 @@ export class ReviewQueueModal extends Modal {
     }
 
     contentEl.createDiv({
-      cls: "note-doctor-review-legend",
+      cls: "vault-triage-review-legend",
       text: "← → navigate · r review · i ignore · e exclude · o open · p add property",
     });
 
-    const nav = contentEl.createDiv({ cls: "note-doctor-review-nav" });
+    const nav = contentEl.createDiv({ cls: "vault-triage-review-nav" });
     const prev = nav.createEl("button", { text: "Previous" });
     prev.disabled = this.index === 0;
     prev.addEventListener("click", () => this.move(-1));
@@ -124,7 +124,7 @@ export class ReviewQueueModal extends Modal {
   ): void {
     // Labelled (icon + text) — a modal has room, and it makes shortcuts and the
     // "— Pro" suffix visible without hovering.
-    const btn = parent.createEl("button", { cls: "note-doctor-review-action" });
+    const btn = parent.createEl("button", { cls: "vault-triage-review-action" });
     const iconEl = btn.createSpan();
     setIcon(iconEl, icon);
     btn.createSpan({ text: tooltip });
@@ -189,7 +189,7 @@ export class ReviewQueueModal extends Modal {
     this.queue = this.queue.filter((i) => i.notePath !== path);
     if (this.index >= this.queue.length) this.index = Math.max(0, this.queue.length - 1);
     if (this.queue.length === 0) {
-      new Notice("Note Doctor: review complete.");
+      new Notice("Vault Triage: review complete.");
       this.close();
       return;
     }
@@ -206,7 +206,7 @@ export class ReviewQueueModal extends Modal {
     this.queue = this.queue.filter((i) => i !== target);
     if (this.index >= this.queue.length) this.index = Math.max(0, this.queue.length - 1);
     if (this.queue.length === 0) {
-      new Notice("Note Doctor: review complete.");
+      new Notice("Vault Triage: review complete.");
       this.close();
       return;
     }

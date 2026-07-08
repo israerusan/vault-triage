@@ -1,6 +1,6 @@
 # Obsidian Release & Review Checklist
 
-A pre-flight for shipping a new version of Note Doctor so it cleanly passes
+A pre-flight for shipping a new version of Vault Triage so it cleanly passes
 Obsidian's automated review (and stays listed). A failed review can delist the
 plugin, and restoring it is slow.
 

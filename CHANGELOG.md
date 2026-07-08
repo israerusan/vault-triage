@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Note Doctor are documented here. The format follows
+All notable changes to Vault Triage are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project adheres to
 [Semantic Versioning](https://semver.org/).
 

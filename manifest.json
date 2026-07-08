@@ -1,11 +1,10 @@
 {
-  "id": "note-doctor",
-  "name": "Note Doctor",
+  "id": "vault-triage",
+  "name": "Vault Triage",
   "version": "0.1.0",
   "minAppVersion": "1.4.0",
-  "description": "Scan your vault for stale notes, orphans, missing metadata, and unfinished drafts, then clean them up fast.",
+  "description": "Find stale, orphaned, unfinished, and metadata-broken notes, then work through them with a focused review flow.",
   "author": "Israel Avila",
   "authorUrl": "https://github.com/israerusan",
-  "fundingUrl": "https://buymeacoffee.com/notedoctor",
   "isDesktopOnly": false
 }

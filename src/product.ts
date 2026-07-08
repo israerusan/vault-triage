@@ -2,16 +2,16 @@
 // the license binding, upsell surfaces, and settings copy consistent.
 
 /** Signed into every license payload; a key only unlocks the product it names. */
-export const PRODUCT_ID = "note-doctor";
+export const PRODUCT_ID = "vault-triage";
 
 /** Plugin-owned folder for exported reports; always skipped by scans. */
-export const REPORT_FOLDER = "Note Doctor Reports";
+export const REPORT_FOLDER = "Vault Triage Reports";
 
-export const PRODUCT_NAME = "Note Doctor";
-export const PRO_NAME = "Note Doctor Pro";
+export const PRODUCT_NAME = "Vault Triage";
+export const PRO_NAME = "Vault Triage Pro";
 
 /** Where "Unlock Pro" sends people. Confirm the real handle before release. */
-export const PURCHASE_URL = "https://buymeacoffee.com/notedoctor";
+export const PURCHASE_URL = "https://github.com/israerusan/vault-triage#pro";
 
 /** One-time price. Kept in one place so every surface stays consistent. */
 export const PRO_PRICE_LABEL = "$12 one-time";

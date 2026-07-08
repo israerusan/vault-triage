@@ -8,12 +8,12 @@ import { requirePro } from "./pro/ProGate";
 import { PromptModal } from "./PromptModal";
 import { PRO_PRICE_LABEL, PRO_TAGLINE, PURCHASE_URL } from "../product";
 
-export const VIEW_TYPE_NOTE_DOCTOR = "note-doctor-dashboard";
+export const VIEW_TYPE_NOTE_DOCTOR = "vault-triage-dashboard";
 
 type Filter = IssueType | "all";
 
 const CHECK_BLURB =
-  "Note Doctor scans for stale notes, thin notes, orphans, missing properties, and draft markers, then helps you clear them out one at a time.";
+  "Vault Triage scans for stale notes, thin notes, orphans, missing properties, and draft markers, then helps you clear them out one at a time.";
 
 export class NoteDoctorView extends ItemView {
   private filter: Filter = "all";
@@ -46,7 +46,7 @@ export class NoteDoctorView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Note Doctor";
+    return "Vault Triage";
   }
 
   getIcon(): string {
@@ -75,7 +75,7 @@ export class NoteDoctorView extends ItemView {
   render(): void {
     const root = this.contentEl;
     root.empty();
-    root.addClass("note-doctor-view");
+    root.addClass("vault-triage-view");
     this.metaEl = null;
     this.summaryEl = null;
     this.progressEl = null;
@@ -87,7 +87,7 @@ export class NoteDoctorView extends ItemView {
     // Only take over the whole panel on the FIRST scan; a re-scan keeps the
     // results visible and shows progress inline (see renderMeta).
     if (this.plugin.scanning && !this.plugin.lastResult) {
-      this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
+      this.metaEl = root.createDiv({ cls: "vault-triage-meta" });
       this.renderScanningMeta();
       return;
     }
@@ -97,7 +97,7 @@ export class NoteDoctorView extends ItemView {
         // First run: let the scan prove value before any paywall.
         this.renderOnboarding(root);
       } else {
-        this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
+        this.metaEl = root.createDiv({ cls: "vault-triage-meta" });
         this.renderHydratedMeta(root);
         if (!this.plugin.isPro) this.renderProCta(root);
       }
@@ -122,7 +122,7 @@ export class NoteDoctorView extends ItemView {
       this.filter = "all";
     }
 
-    this.metaEl = root.createDiv({ cls: "note-doctor-meta" });
+    this.metaEl = root.createDiv({ cls: "vault-triage-meta" });
     this.renderMeta(issues);
     this.renderToolbar(root);
     if (this.bulkMode) this.renderBulkBar(root);
@@ -145,8 +145,8 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderHeader(root: HTMLElement): void {
-    const header = root.createDiv({ cls: "note-doctor-header" });
-    header.createEl("h2", { text: "Note Doctor" });
+    const header = root.createDiv({ cls: "vault-triage-header" });
+    header.createEl("h2", { text: "Vault Triage" });
     const btn = header.createEl("button", {
       text: this.plugin.scanning ? "Scanning…" : "Run scan",
       cls: "mod-cta",
@@ -157,14 +157,14 @@ export class NoteDoctorView extends ItemView {
     if (!this.plugin.isPro && this.plugin.settings.proCtaDismissed) {
       header.createEl("a", {
         text: "Upgrade to Pro",
-        cls: "note-doctor-header-upsell",
+        cls: "vault-triage-header-upsell",
         href: PURCHASE_URL,
       });
     }
 
     const profiles = this.plugin.settings.savedProfiles;
     if (this.plugin.isPro && profiles.length > 0) {
-      const select = header.createEl("select", { cls: "dropdown note-doctor-profile-select" });
+      const select = header.createEl("select", { cls: "dropdown vault-triage-profile-select" });
       select.createEl("option", { text: "Run a profile…", value: "" });
       for (const p of profiles) select.createEl("option", { text: p.name, value: p.id });
       // Keep the active profile selected so a scoped result stays identifiable.
@@ -178,11 +178,11 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderOnboarding(root: HTMLElement): void {
-    const card = root.createDiv({ cls: "note-doctor-onboarding" });
+    const card = root.createDiv({ cls: "vault-triage-onboarding" });
     card.createEl("h3", { text: "Find what needs attention" });
-    card.createDiv({ cls: "note-doctor-onboarding-blurb", text: CHECK_BLURB });
+    card.createDiv({ cls: "vault-triage-onboarding-blurb", text: CHECK_BLURB });
     card.createDiv({
-      cls: "note-doctor-onboarding-hint",
+      cls: "vault-triage-onboarding-hint",
       text: "Tip: to check for missing metadata, add fields under Required properties in settings.",
     });
     const btn = card.createEl("button", { text: "Run your first scan", cls: "mod-cta" });
@@ -193,11 +193,11 @@ export class NoteDoctorView extends ItemView {
     const host = this.metaEl;
     if (!host) return;
     host.empty();
-    const stat = host.createDiv({ cls: "note-doctor-stat" });
-    stat.createSpan({ cls: "note-doctor-stat-label", text: "Scanning your vault…" });
-    this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
-    const track = host.createDiv({ cls: "note-doctor-progress" });
-    this.progressEl = track.createDiv({ cls: "note-doctor-progress-bar" });
+    const stat = host.createDiv({ cls: "vault-triage-stat" });
+    stat.createSpan({ cls: "vault-triage-stat-label", text: "Scanning your vault…" });
+    this.summaryEl = host.createDiv({ cls: "vault-triage-summary" });
+    const track = host.createDiv({ cls: "vault-triage-progress" });
+    this.progressEl = track.createDiv({ cls: "vault-triage-progress-bar" });
     this.showScanProgress(this.plugin.scanDone, this.plugin.scanTotal);
   }
 
@@ -211,24 +211,24 @@ export class NoteDoctorView extends ItemView {
     }
     host.empty();
     const affected = summary.affectedNotes ?? summary.totalIssues;
-    const stat = host.createDiv({ cls: "note-doctor-stat" });
-    stat.createSpan({ cls: "note-doctor-stat-num", text: String(affected) });
+    const stat = host.createDiv({ cls: "vault-triage-stat" });
+    stat.createSpan({ cls: "vault-triage-stat-num", text: String(affected) });
     stat.createSpan({
-      cls: "note-doctor-stat-label",
+      cls: "vault-triage-stat-label",
       text: affected === 1 ? "note needed attention" : "notes needed attention",
     });
     host
-      .createDiv({ cls: "note-doctor-summary" })
+      .createDiv({ cls: "vault-triage-summary" })
       .setText(
         `Last scan ${relativeTime(summary.scannedAt)} · ${summary.totalIssues} issues · run a scan to review`
       );
-    const tiles = host.createDiv({ cls: "note-doctor-tiles" });
+    const tiles = host.createDiv({ cls: "vault-triage-tiles" });
     for (const type of ISSUE_TYPES) {
       const count = summary.byType[type] ?? 0;
       if (count === 0) continue;
-      const tile = tiles.createDiv({ cls: "note-doctor-tile is-static" });
-      tile.createDiv({ cls: "note-doctor-tile-count", text: String(count) });
-      tile.createDiv({ cls: "note-doctor-tile-label", text: ISSUE_TYPE_LABELS[type] });
+      const tile = tiles.createDiv({ cls: "vault-triage-tile is-static" });
+      tile.createDiv({ cls: "vault-triage-tile-count", text: String(count) });
+      tile.createDiv({ cls: "vault-triage-tile-label", text: ISSUE_TYPE_LABELS[type] });
     }
   }
 
@@ -242,10 +242,10 @@ export class NoteDoctorView extends ItemView {
     const outstanding = issues.filter((i) => !this.plugin.isReviewed(i));
     const affected = new Set(outstanding.map((i) => i.notePath)).size;
     const reviewedCount = issues.length - outstanding.length;
-    const stat = host.createDiv({ cls: "note-doctor-stat" });
-    stat.createSpan({ cls: "note-doctor-stat-num", text: String(affected) });
+    const stat = host.createDiv({ cls: "vault-triage-stat" });
+    stat.createSpan({ cls: "vault-triage-stat-num", text: String(affected) });
     stat.createSpan({
-      cls: "note-doctor-stat-label",
+      cls: "vault-triage-stat-label",
       text:
         affected === 0
           ? issues.length === 0
@@ -256,7 +256,7 @@ export class NoteDoctorView extends ItemView {
             : "notes need attention",
     });
 
-    this.summaryEl = host.createDiv({ cls: "note-doctor-summary" });
+    this.summaryEl = host.createDiv({ cls: "vault-triage-summary" });
     const last = this.plugin.lastResult;
     if (this.plugin.scanning) {
       this.summaryEl.setText(
@@ -264,8 +264,8 @@ export class NoteDoctorView extends ItemView {
           ? `Scanning ${this.plugin.scanDone} / ${this.plugin.scanTotal}…`
           : "Scanning…"
       );
-      const track = host.createDiv({ cls: "note-doctor-progress" });
-      this.progressEl = track.createDiv({ cls: "note-doctor-progress-bar" });
+      const track = host.createDiv({ cls: "vault-triage-progress" });
+      this.progressEl = track.createDiv({ cls: "vault-triage-progress-bar" });
       this.showScanProgress(this.plugin.scanDone, this.plugin.scanTotal);
     } else if (last) {
       const issueWord = issues.length === 1 ? "issue" : "issues";
@@ -286,16 +286,16 @@ export class NoteDoctorView extends ItemView {
 
     if (outstanding.length > 0) {
       host.createDiv({
-        cls: "note-doctor-legend",
+        cls: "vault-triage-legend",
         text: "Severity: H high · M medium · L low",
       });
     }
 
     if (outstanding.length > 0 && this.plugin.settings.requiredProperties.length === 0) {
-      const nudge = host.createDiv({ cls: "note-doctor-nudge" });
+      const nudge = host.createDiv({ cls: "vault-triage-nudge" });
       nudge.appendText("Also catch notes missing metadata? ");
       const link = nudge.createEl("button", {
-        cls: "note-doctor-inline-link",
+        cls: "vault-triage-inline-link",
         text: "Flag notes missing a property",
       });
       link.addEventListener("click", () => {
@@ -317,7 +317,7 @@ export class NoteDoctorView extends ItemView {
 
   private renderTiles(host: HTMLElement, issues: NoteIssue[]): void {
     const counts = countByType(issues);
-    const tiles = host.createDiv({ cls: "note-doctor-tiles" });
+    const tiles = host.createDiv({ cls: "vault-triage-tiles" });
     this.tile(tiles, "All", issues.length, this.filter === "all", () => {
       this.setFilter("all");
     });
@@ -336,10 +336,10 @@ export class NoteDoctorView extends ItemView {
     active: boolean,
     onClick: () => void
   ): void {
-    const tile = host.createEl("button", { cls: "note-doctor-tile" });
+    const tile = host.createEl("button", { cls: "vault-triage-tile" });
     if (active) tile.addClass("is-active");
-    tile.createDiv({ cls: "note-doctor-tile-count", text: String(count) });
-    tile.createDiv({ cls: "note-doctor-tile-label", text: label });
+    tile.createDiv({ cls: "vault-triage-tile-count", text: String(count) });
+    tile.createDiv({ cls: "vault-triage-tile-label", text: label });
     tile.addEventListener("click", onClick);
   }
 
@@ -362,7 +362,7 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderToolbar(root: HTMLElement): void {
-    const bar = root.createDiv({ cls: "note-doctor-toolbar" });
+    const bar = root.createDiv({ cls: "vault-triage-toolbar" });
 
     const sort = bar.createEl("select", { cls: "dropdown" });
     for (const [value, text] of [
@@ -392,7 +392,7 @@ export class NoteDoctorView extends ItemView {
 
     const bulk = bar.createEl("button", { text: this.bulkMode ? "Exit bulk" : "Bulk actions" });
     if (!this.bulkMode && !this.plugin.isPro) {
-      bulk.createSpan({ cls: "note-doctor-pro-pill", text: "Pro" });
+      bulk.createSpan({ cls: "vault-triage-pro-pill", text: "Pro" });
     }
     bulk.addEventListener("click", () => {
       if (this.bulkMode) {
@@ -409,7 +409,7 @@ export class NoteDoctorView extends ItemView {
   }
 
   private renderBulkBar(root: HTMLElement): void {
-    const bar = root.createDiv({ cls: "note-doctor-bulk-bar" });
+    const bar = root.createDiv({ cls: "vault-triage-bulk-bar" });
     this.selCountEl = bar.createSpan({ text: `${this.selected.size} selected` });
     this.bulkActionButtons = [];
 
@@ -425,7 +425,7 @@ export class NoteDoctorView extends ItemView {
       // Update the rendered checkboxes in place (don't rebuild — that would reset
       // pagination). Rows shown so far are a subset of `shown`.
       if (this.resultsEl) {
-        this.resultsEl.querySelectorAll("input.note-doctor-check").forEach((el) => {
+        this.resultsEl.querySelectorAll("input.vault-triage-check").forEach((el) => {
           (el as HTMLInputElement).checked = !nowAll;
         });
       }
@@ -511,19 +511,19 @@ export class NoteDoctorView extends ItemView {
   private renderProCta(root: HTMLElement): void {
     // Once dismissed, the paywall shrinks to a quiet header link (see renderHeader).
     if (this.plugin.settings.proCtaDismissed) return;
-    const card = root.createDiv({ cls: "note-doctor-pro-cta" });
-    const dismiss = card.createEl("button", { cls: "note-doctor-cta-dismiss", text: "×" });
+    const card = root.createDiv({ cls: "vault-triage-pro-cta" });
+    const dismiss = card.createEl("button", { cls: "vault-triage-cta-dismiss", text: "×" });
     dismiss.setAttribute("aria-label", "Dismiss");
     dismiss.addEventListener("click", () => {
       this.plugin.settings.proCtaDismissed = true;
       this.plugin.queueSave();
       this.render();
     });
-    card.createEl("strong", { text: `Note Doctor Pro — ${PRO_PRICE_LABEL}` });
+    card.createEl("strong", { text: `Vault Triage Pro — ${PRO_PRICE_LABEL}` });
     card.createDiv({ text: PRO_TAGLINE });
     card.createEl("a", {
       text: `Get Pro — ${PRO_PRICE_LABEL}`,
-      cls: "note-doctor-cta-link",
+      cls: "vault-triage-cta-link",
       href: PURCHASE_URL,
     });
   }

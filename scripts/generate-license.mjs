@@ -1,4 +1,4 @@
-// Author-only tool. Signs a Note Doctor Pro license key for a customer.
+// Author-only tool. Signs a Vault Triage Pro license key for a customer.
 // Requires scripts/.license-private.key (never commit or publish it).
 //
 //   npm run license:generate -- customer@email.com
@@ -38,7 +38,7 @@ if (!fs.existsSync(privateKeyPath)) {
 
 const secretKey = fromBase64(fs.readFileSync(privateKeyPath, "utf8").trim());
 const payload = {
-  product: "note-doctor",
+  product: "vault-triage",
   email,
   issued: new Date().toISOString(),
 };
@@ -46,6 +46,6 @@ const payloadBytes = new TextEncoder().encode(JSON.stringify(payload));
 const signature = nacl.sign.detached(payloadBytes, secretKey);
 const licenseKey = `${toBase64(payloadBytes)}.${toBase64(signature)}`;
 
-console.log("\nNote Doctor — Pro license\n");
+console.log("\nVault Triage — Pro license\n");
 console.log(`Email: ${email}`);
 console.log(`Key:   ${licenseKey}\n`);

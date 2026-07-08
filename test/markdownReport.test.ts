@@ -49,7 +49,7 @@ const withProfile: ReportInput = {
 const report = buildMarkdownReport(withProfile);
 const reportLines = report.split("\n");
 
-assert.ok(reportLines.includes("# Note Doctor Report"), "has title");
+assert.ok(reportLines.includes("# Vault Triage Report"), "has title");
 assert.ok(reportLines.includes("Date: 2026-07-05T00:00:00Z"), "has date");
 assert.ok(reportLines.includes("Profile: Weekly cleanup"), "has profile line");
 
@@ -90,6 +90,6 @@ const emptyReport = buildMarkdownReport(noProfile);
 
 assert.ok(!emptyReport.includes("Profile:"), "profile line omitted when absent");
 assert.ok(emptyReport.includes("- Total issues: 0"), "zero issues total");
-assert.ok(emptyReport.includes("# Note Doctor Report"), "empty report still has title");
+assert.ok(emptyReport.includes("# Vault Triage Report"), "empty report still has title");
 
 console.log("markdownReport tests passed");

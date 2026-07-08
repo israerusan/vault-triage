@@ -1,4 +1,4 @@
-# Note Doctor — v1 feature checklist (Free / Pro)
+# Vault Triage — v1 feature checklist (Free / Pro)
 
 The v1 scope: sellable, buildable, not bloated.
 
@@ -31,7 +31,7 @@ The v1 scope: sellable, buildable, not bloated.
       (no risky content rewrites in v1)
 - [x] Advanced review: review a filtered/sorted subset from the dashboard
 - [x] Severity tuning: per-issue-type weights
-- [x] Export report: Markdown, grouped by issue type, saved to `Note Doctor Reports/`
+- [x] Export report: Markdown, grouped by issue type, saved to `Vault Triage Reports/`
 
 ## Commands
 
