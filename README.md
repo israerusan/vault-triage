@@ -96,6 +96,8 @@ Pro is for people who want recurring audits, custom standards, bulk cleanup work
 
 Vault Triage Pro uses an offline license key and a one-time payment.
 
+**Buy Vault Triage Pro — $12 one-time:** https://buymeacoffee.com/vaultspotlight/e/560209
+
 What you get:
 - saved audits
 - custom rules
