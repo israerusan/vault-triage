@@ -72,7 +72,7 @@ Purchase: [Buy Me a Coffee — Vault Triage Pro](https://buymeacoffee.com/vaults
 
 **Community plugins**
 
-After community review approval, search for **Vault Triage** in Community plugins and install it there.
+Open **Settings → Community plugins**, search **Vault Triage**, and install it — one click, auto-updates.
 
 **Manual install**
 
