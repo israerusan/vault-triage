@@ -4,6 +4,11 @@
 
 Vault Triage scans your vault for stale notes, thin notes, orphan notes, missing metadata, and unfinished drafts — then gives you a clean review workflow so maintenance stops feeling like a side quest from hell.
 
+<!-- SCREENSHOT SLOT — drop a real Obsidian capture here to lift conversions.
+     ![Vault Triage dashboard: flagged notes grouped by issue, with the review queue open](docs/assets/hero.png)
+     Suggested shot: the triage dashboard with a few stale/thin/orphan flags and the review queue visible. Save as docs/assets/hero.png -->
+
+
 Free gets you real scanning and one-note-at-a-time cleanup. Pro adds saved audits, custom rules, bulk workflows, severity tuning, and Markdown reports.
 
 > Local-first, privacy-friendly, and built to help you decide what to fix first instead of burying you in note guilt.
@@ -55,6 +60,14 @@ Free is genuinely useful. Pro is about speed, repeatability, and scale.
 | Severity tuning |  | ✓ |
 | Markdown report export |  | ✓ |
 
+Purchase: [Buy Me a Coffee — Vault Triage Pro](https://buymeacoffee.com/vaultspotlight/e/560209). License keys are verified **offline** (Ed25519) — no account, server, or subscription.
+
+**Activate Pro**
+
+1. Purchase via the link above.
+2. Your license key is emailed to you **automatically, within seconds** — delivery is fully automated, no waiting.
+3. Paste it into the plugin's settings — Pro unlocks instantly, fully offline.
+
 ## Install
 
 **Community plugins**
@@ -96,7 +109,7 @@ Pro is for people who want recurring audits, custom standards, bulk cleanup work
 
 Vault Triage Pro uses an offline license key and a one-time payment.
 
-**Buy Vault Triage Pro — $12 one-time:** https://buymeacoffee.com/vaultspotlight/e/560209
+Purchase: [Buy Me a Coffee — Vault Triage Pro — $12 one-time](https://buymeacoffee.com/vaultspotlight/e/560209). License keys are verified **offline** (Ed25519) — no account, server, or subscription.
 
 What you get:
 - saved audits
@@ -105,13 +118,11 @@ What you get:
 - severity tuning
 - Markdown report export
 
-Current delivery model:
+Delivery model:
 - one-time purchase
 - no account required
 - offline license verification
-- license key delivered manually by the author after purchase
-
-Current sales are fulfilled manually by the author and delivered as offline license keys. Replace this with instant checkout before you try to scale paid distribution.
+- license key delivered automatically by email, in seconds
 
 ## Privacy
 
