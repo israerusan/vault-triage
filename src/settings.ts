@@ -63,6 +63,7 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
     this.renderSeveritySection();
     this.renderRulesSection();
     this.renderProfilesSection();
+    this.renderFeedbackSection();
   }
 
   /** Debounced save for field edits (coalesces per-keystroke writes). */
@@ -408,6 +409,27 @@ export class NoteDoctorSettingTab extends PluginSettingTab {
         }).open();
       })
     );
+  }
+
+  // --- Feedback -------------------------------------------------------------
+
+  private renderFeedbackSection(): void {
+    const { containerEl } = this;
+    new Setting(containerEl).setName("Feedback").setHeading();
+
+    new Setting(containerEl)
+      .setName("Bugs and feature requests")
+      .setDesc("Issues and ideas are tracked on GitHub. Opens in your browser.")
+      .addButton((b) =>
+        b.setButtonText("Report a bug").onClick(() => {
+          window.open("https://github.com/israerusan/vault-triage/issues/new?labels=bug");
+        })
+      )
+      .addButton((b) =>
+        b.setButtonText("Request a feature").onClick(() => {
+          window.open("https://github.com/israerusan/vault-triage/issues/new?labels=enhancement");
+        })
+      );
   }
 
   /** A section heading that shows a Pro pill and, for free users, an upsell row. */
